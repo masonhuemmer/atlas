@@ -97,7 +97,8 @@ func confluenceCreate(args []string, d Deps, format string) int {
 	siteFlag := fsset.String("site", "", "site alias, hostname, or UUID")
 	space := fsset.String("space", "", "space key or numeric spaceId")
 	title := fsset.String("title", "", "page title")
-	body := fsset.String("body", "", "markdown body")
+	body := fsset.String("body", "", "page body")
+	bodyFormat := fsset.String("body-format", domain.DefaultBodyFormat, "markdown (default) or storage XHTML")
 	dry := fsset.Bool("dry-run", false, "")
 	if err := parseMixed(fsset, args); err != nil {
 		return fail(d, domain.Usage(err.Error()))
@@ -116,9 +117,10 @@ func confluenceCreate(args []string, d Deps, format string) int {
 		return fail(d, domain.Service("confluence adapter not configured"))
 	}
 	in := domain.CreatePage{
-		Space: strings.ToUpper(strings.TrimSpace(*space)),
-		Title: strings.TrimSpace(*title),
-		Body:  *body,
+		Space:      strings.ToUpper(strings.TrimSpace(*space)),
+		Title:      strings.TrimSpace(*title),
+		Body:       *body,
+		BodyFormat: *bodyFormat,
 	}
 	page, err := d.Confluence.Create(ctx(), site.Hostname, in, *dry)
 	if err != nil {
@@ -143,7 +145,8 @@ func confluenceUpdate(args []string, d Deps, format string) int {
 	fsset := flag.NewFlagSet("confluence update", flag.ContinueOnError)
 	fsset.SetOutput(d.Stderr)
 	siteFlag := fsset.String("site", "", "site alias, hostname, or UUID")
-	body := fsset.String("body", "", "markdown body")
+	body := fsset.String("body", "", "page body")
+	bodyFormat := fsset.String("body-format", domain.DefaultBodyFormat, "markdown (default) or storage XHTML")
 	dry := fsset.Bool("dry-run", false, "")
 	if err := parseMixed(fsset, args); err != nil {
 		return fail(d, domain.Usage(err.Error()))
@@ -165,7 +168,7 @@ func confluenceUpdate(args []string, d Deps, format string) int {
 	if d.Confluence == nil {
 		return fail(d, domain.Service("confluence adapter not configured"))
 	}
-	page, err := d.Confluence.Update(ctx(), site.Hostname, pageID, *body, *dry)
+	page, err := d.Confluence.Update(ctx(), site.Hostname, pageID, *body, *bodyFormat, *dry)
 	if err != nil {
 		return fail(d, err)
 	}

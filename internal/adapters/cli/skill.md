@@ -63,8 +63,8 @@ keys map to an alias. JQL/CQL that names two sites is usage. A
 | Link issues without changing parent | `atlas_write` `namespace=jira` `verb=link` `args=["KEY-1","KEY-2"]` + `write_opt_in` |
 | Comment / transition / link | `atlas_write` `jira` `comment` / `transition` / `link` |
 | Internal JSM note on a licensed site | `atlas_write` `namespace=jira` `verb=comment` `args=["KEY-1"]` `flags={body:"…",internal:true}` + `write_opt_in`; the key must resolve as a customer request |
-| Confluence get/search | `atlas_read` `confluence` `get` / `search` (`cql`) |
-| Confluence create/update | `atlas_write`; no delete |
+| Confluence get/search | `atlas_read` `confluence` `get` / `search` (`cql`); body is storage markup |
+| Confluence create/update | `atlas_write`; Markdown is converted to storage markup. Set `body-format:"storage"` for prepared Confluence XHTML; no delete |
 | PR get/list/diff | `atlas_read` `pr` `get` / `list` / `diff` (`repo`, `id`) |
 | PR create/edit/comment/merge | `atlas_write`; edit an open PR's title or description with `namespace=pr` `verb=edit` `flags={repo:"SLUG",id:1,description:"…"}` + `write_opt_in`; no delete |
 | JSM desks/types/list/get | `atlas_read` `jsm` `desks` / `types` / `list` / `get` |

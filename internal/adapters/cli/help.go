@@ -88,7 +88,8 @@ search: atlas confluence search --cql 'space = KEY AND type = page'
 create: atlas confluence create --space KEY --title '...' --body '...'
 update: atlas confluence update <pageId> --body '...' [--site ALIAS]
 
-Space keys map to a site in config. Body format is markdown.
+Space keys map to a site in config. Create/update convert Markdown to storage markup.
+Use --body-format storage for prepared Confluence XHTML. Get returns storage markup.
 CQL that names a configured space infers that site; CQL with no space and no --site is usage.
 There is no delete verb.
 MCP writes dry-run unless write_opt_in is true.

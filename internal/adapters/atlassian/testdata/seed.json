@@ -89,7 +89,7 @@
       "alias": "sesami-io",
       "space": "CCAB",
       "title": "CAB-109",
-      "body": "Space page for CAB-109"
+      "body": "<p>Space page for CAB-109</p>"
     }
   ],
   "pull_requests": [

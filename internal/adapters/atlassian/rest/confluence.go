@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	confluenceapp "github.com/masonhuemmer/atlas/internal/app/confluence"
 	"github.com/masonhuemmer/atlas/internal/domain"
 )
 
@@ -55,9 +56,13 @@ func (c Confluence) Search(ctx context.Context, hostname, cql string) (domain.Pa
 }
 
 func (c Confluence) Create(ctx context.Context, hostname string, in domain.CreatePage, dryRun bool) (domain.Page, error) {
+	storageBody, err := confluenceapp.StorageBody(in.Body, in.BodyFormat)
+	if err != nil {
+		return domain.Page{}, err
+	}
 	preview := domain.Page{
-		Site: hostname, Space: in.Space, Title: in.Title, Body: in.Body,
-		ContentFormat: domain.DefaultBodyFormat, Status: "current", Version: 1,
+		Site: hostname, Space: in.Space, Title: in.Title, Body: storageBody,
+		ContentFormat: domain.StorageBodyFormat, Status: "current", Version: 1,
 	}
 	if dryRun {
 		return preview, nil
@@ -76,7 +81,7 @@ func (c Confluence) Create(ctx context.Context, hostname string, in domain.Creat
 		"title":   in.Title,
 		"body": map[string]any{
 			"representation": "storage",
-			"value":          in.Body,
+			"value":          storageBody,
 		},
 	}
 	u := joinURL(c.origin(hostname), "/wiki/api/v2/pages")
@@ -91,17 +96,21 @@ func (c Confluence) Create(ctx context.Context, hostname string, in domain.Creat
 	if p.Space == "" {
 		p.Space = in.Space
 	}
-	p.Body = in.Body
+	p.Body = storageBody
 	return p, nil
 }
 
-func (c Confluence) Update(ctx context.Context, hostname, pageID, body string, dryRun bool) (domain.Page, error) {
+func (c Confluence) Update(ctx context.Context, hostname, pageID, body, bodyFormat string, dryRun bool) (domain.Page, error) {
+	storageBody, err := confluenceapp.StorageBody(body, bodyFormat)
+	if err != nil {
+		return domain.Page{}, err
+	}
 	cur, err := c.Get(ctx, hostname, pageID)
 	if err != nil {
 		return domain.Page{}, err
 	}
 	if dryRun {
-		cur.Body = body
+		cur.Body = storageBody
 		cur.Version++
 		return cur, nil
 	}
@@ -115,7 +124,7 @@ func (c Confluence) Update(ctx context.Context, hostname, pageID, body string, d
 		"title":  cur.Title,
 		"body": map[string]any{
 			"representation": "storage",
-			"value":          body,
+			"value":          storageBody,
 		},
 		"version": map[string]any{"number": cur.Version + 1},
 	}
@@ -128,7 +137,7 @@ func (c Confluence) Update(ctx context.Context, hostname, pageID, body string, d
 		return domain.Page{}, MapConfluenceStatus(code)
 	}
 	p := pageFromREST(hostname, mustJSON(raw))
-	p.Body = body
+	p.Body = storageBody
 	return p, nil
 }
 
@@ -183,7 +192,7 @@ func pageFromREST(hostname string, m map[string]any) domain.Page {
 	}
 	p := domain.Page{
 		ID: id, Site: hostname, Space: space, Title: str(m, "title"),
-		Body: body, ContentFormat: domain.DefaultBodyFormat, Status: str(m, "status"),
+		Body: body, ContentFormat: domain.StorageBodyFormat, Status: str(m, "status"),
 		URL: domain.WikiPageURL(hostname, space, id), Version: ver,
 	}
 	if p.Status == "" {
@@ -203,7 +212,7 @@ func pageFromV1(hostname string, m map[string]any) domain.Page {
 	}
 	return domain.Page{
 		ID: id, Site: hostname, Space: space, Title: str(m, "title"),
-		Body: body, ContentFormat: domain.DefaultBodyFormat, Status: str(m, "status"),
+		Body: body, ContentFormat: domain.StorageBodyFormat, Status: str(m, "status"),
 		URL: domain.WikiPageURL(hostname, space, id),
 	}
 }

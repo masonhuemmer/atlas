@@ -18,6 +18,7 @@ Do not print tokens.
 	recipeConfluenceWrite = `confluence-write
 
 Space keys map to a site in config. No delete verb.
+Create/update convert Markdown to storage markup. For prepared Confluence XHTML, pass body-format=storage.
 
   atlas confluence search --cql 'space = KEY AND type = page'
   atlas confluence create --space KEY --title '…' --body '…' --dry-run

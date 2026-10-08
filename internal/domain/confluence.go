@@ -1,7 +1,10 @@
 package domain
 
-// DefaultBodyFormat is markdown for Confluence create/update/get.
+// DefaultBodyFormat is the input format for Confluence create/update.
 const DefaultBodyFormat = "markdown"
+
+// StorageBodyFormat is the format Confluence returns and stores.
+const StorageBodyFormat = "storage"
 
 // Page is one Confluence page on a single cloud.
 // Site is the hostname. URL is the wiki page link.
@@ -26,11 +29,12 @@ type PageSearchResult struct {
 }
 
 // CreatePage is the REST field set we own for atlas confluence create.
-// Body format is markdown. Space accepts a space key or numeric id.
+// BodyFormat defaults to markdown. Space accepts a space key or numeric id.
 type CreatePage struct {
-	Space string
-	Title string
-	Body  string
+	Space      string
+	Title      string
+	Body       string
+	BodyFormat string
 }
 
 // WikiPageURL is https://<hostname>/wiki/spaces/<SPACE>/pages/<id>.
