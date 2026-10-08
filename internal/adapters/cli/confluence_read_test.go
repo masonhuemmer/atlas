@@ -80,7 +80,7 @@ func TestConfluenceGetSeedPage(t *testing.T) {
 	if page.Site != "sesami-io.atlassian.net" {
 		t.Fatalf("site %q", page.Site)
 	}
-	if page.ContentFormat != domain.DefaultBodyFormat {
+	if page.ContentFormat != domain.StorageBodyFormat {
 		t.Fatalf("format %q", page.ContentFormat)
 	}
 }

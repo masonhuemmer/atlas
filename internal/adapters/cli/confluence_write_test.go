@@ -52,7 +52,7 @@ func TestConfluenceCreatePersistsAndGetFindsPage(t *testing.T) {
 	if created.Site != "sesami-io.atlassian.net" || created.Space != "CCAB" {
 		t.Fatalf("%+v", created)
 	}
-	if created.ContentFormat != domain.DefaultBodyFormat {
+	if created.ContentFormat != domain.StorageBodyFormat {
 		t.Fatalf("format %q", created.ContentFormat)
 	}
 	out.Reset()
@@ -65,7 +65,7 @@ func TestConfluenceCreatePersistsAndGetFindsPage(t *testing.T) {
 	if err := json.Unmarshal(out.Bytes(), &got); err != nil {
 		t.Fatal(err, out.String())
 	}
-	if got.ID != created.ID || got.Body != "markdown body" {
+	if got.ID != created.ID || got.Body != "<p>markdown body</p>\n" {
 		t.Fatalf("%+v", got)
 	}
 }
@@ -80,8 +80,32 @@ func TestConfluenceUpdatePersists(t *testing.T) {
 	if err := json.Unmarshal(out.Bytes(), &page); err != nil {
 		t.Fatal(err, out.String())
 	}
-	if page.Body != "revised" || page.Version != 2 {
+	if page.Body != "<p>revised</p>\n" || page.Version != 2 {
 		t.Fatalf("%+v", page)
+	}
+}
+
+func TestConfluenceCreatePreparedStorage(t *testing.T) {
+	d, out, errw := testDeps()
+	body := `<ac:structured-macro ac:name="code" />`
+	code := Run([]string{"atlas", "confluence", "create", "--space", "CCAB", "--title", "Macro", "--body", body, "--body-format", "storage"}, d)
+	if code != domain.ExitOK {
+		t.Fatal(code, errw.String())
+	}
+	var page domain.Page
+	if err := json.Unmarshal(out.Bytes(), &page); err != nil {
+		t.Fatal(err)
+	}
+	if page.Body != body || page.ContentFormat != domain.StorageBodyFormat {
+		t.Fatalf("%+v", page)
+	}
+}
+
+func TestConfluenceCreateRejectsUnknownBodyFormat(t *testing.T) {
+	d, _, errw := testDeps()
+	code := Run([]string{"atlas", "confluence", "create", "--space", "CCAB", "--title", "Bad", "--body", "text", "--body-format", "wiki"}, d)
+	if code != domain.ExitUsage {
+		t.Fatal(code, errw.String())
 	}
 }
 
@@ -138,7 +162,7 @@ func TestMCPConfluenceCreateWriteGate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Title != "gated" || got.Body != "yes" {
+	if got.Title != "gated" || got.Body != "<p>yes</p>\n" {
 		t.Fatalf("%+v", got)
 	}
 }
@@ -187,7 +211,7 @@ func TestMCPConfluenceUpdateWriteGate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Body != "opted in" {
+	if got.Body != "<p>opted in</p>\n" {
 		t.Fatalf("%+v", got)
 	}
 }

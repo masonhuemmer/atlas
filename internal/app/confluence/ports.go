@@ -11,5 +11,5 @@ type Store interface {
 	Get(ctx context.Context, hostname, pageID string) (domain.Page, error)
 	Search(ctx context.Context, hostname, cql string) (domain.PageSearchResult, error)
 	Create(ctx context.Context, hostname string, in domain.CreatePage, dryRun bool) (domain.Page, error)
-	Update(ctx context.Context, hostname, pageID, body string, dryRun bool) (domain.Page, error)
+	Update(ctx context.Context, hostname, pageID, body, bodyFormat string, dryRun bool) (domain.Page, error)
 }

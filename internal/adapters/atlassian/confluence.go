@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	confluenceapp "github.com/masonhuemmer/atlas/internal/app/confluence"
 	"github.com/masonhuemmer/atlas/internal/domain"
 )
 
@@ -35,11 +36,11 @@ func (c ConfluenceAPI) Create(ctx context.Context, hostname string, in domain.Cr
 	return c.Memory.CreatePage(ctx, hostname, in, dryRun)
 }
 
-func (c ConfluenceAPI) Update(ctx context.Context, hostname, pageID, body string, dryRun bool) (domain.Page, error) {
+func (c ConfluenceAPI) Update(ctx context.Context, hostname, pageID, body, bodyFormat string, dryRun bool) (domain.Page, error) {
 	if c.Memory == nil {
 		return domain.Page{}, domain.Service("confluence memory not configured")
 	}
-	return c.Memory.UpdatePage(ctx, hostname, pageID, body, dryRun)
+	return c.Memory.UpdatePage(ctx, hostname, pageID, body, bodyFormat, dryRun)
 }
 
 func (m *Memory) GetPage(_ context.Context, hostname, pageID string) (domain.Page, error) {
@@ -97,6 +98,10 @@ func (m *Memory) CreatePage(_ context.Context, hostname string, in domain.Create
 	space := strings.ToUpper(strings.TrimSpace(in.Space))
 	title := strings.TrimSpace(in.Title)
 	body := in.Body
+	body, err := confluenceapp.StorageBody(body, in.BodyFormat)
+	if err != nil {
+		return domain.Page{}, err
+	}
 	if hostname == "" || space == "" || title == "" {
 		return domain.Page{}, domain.Usage("space and title are required")
 	}
@@ -108,7 +113,7 @@ func (m *Memory) CreatePage(_ context.Context, hostname string, in domain.Create
 		Space:         space,
 		Title:         title,
 		Body:          body,
-		ContentFormat: domain.DefaultBodyFormat,
+		ContentFormat: domain.StorageBodyFormat,
 		Status:        "current",
 		Version:       1,
 	}
@@ -128,7 +133,7 @@ func (m *Memory) CreatePage(_ context.Context, hostname string, in domain.Create
 	return clonePage(preview), nil
 }
 
-func (m *Memory) UpdatePage(_ context.Context, hostname, pageID, body string, dryRun bool) (domain.Page, error) {
+func (m *Memory) UpdatePage(_ context.Context, hostname, pageID, body, bodyFormat string, dryRun bool) (domain.Page, error) {
 	if m == nil {
 		return domain.Page{}, domain.Service("confluence memory not configured")
 	}
@@ -140,6 +145,10 @@ func (m *Memory) UpdatePage(_ context.Context, hostname, pageID, body string, dr
 	if strings.TrimSpace(body) == "" {
 		return domain.Page{}, domain.Usage("update requires --body")
 	}
+	body, err := confluenceapp.StorageBody(body, bodyFormat)
+	if err != nil {
+		return domain.Page{}, err
+	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	p, ok := m.pages[memKey(hostname, pageID)]
@@ -148,7 +157,7 @@ func (m *Memory) UpdatePage(_ context.Context, hostname, pageID, body string, dr
 	}
 	next := clonePage(p)
 	next.Body = body
-	next.ContentFormat = domain.DefaultBodyFormat
+	next.ContentFormat = domain.StorageBodyFormat
 	next.Version = p.Version + 1
 	if dryRun {
 		return next, nil

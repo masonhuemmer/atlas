@@ -148,7 +148,7 @@ func Seed() *Memory {
 			Space:         p.Space,
 			Title:         p.Title,
 			Body:          p.Body,
-			ContentFormat: domain.DefaultBodyFormat,
+			ContentFormat: domain.StorageBodyFormat,
 			Status:        "current",
 			URL:           domain.WikiPageURL(host, p.Space, p.ID),
 			Version:       1,

@@ -102,6 +102,8 @@ atlas <namespace> <verb> [flags]
 
 Every call resolves one site from config. A `jsm_customer` site refuses `jira` and `confluence` (use `atlas jsm`). `atlas pr` uses the workspace Bitbucket cred, not a site token. Exit classes: `0` success, `3` usage/config, `4` auth, `5` service, `6` not-found.
 
+Confluence create and update convert Markdown bodies to Confluence storage markup. Use `--body-format storage` for prepared Confluence XHTML; get returns storage markup.
+
 For an internal note on a JSM customer request at a licensed site, use `atlas jira comment KEY-1 --body '...' --internal`. Atlas checks that the request is accessible, posts with internal visibility, and verifies the response. It never falls back to a public comment. `--dry-run` previews the command without checking site access.
 
 Find an account ID before assigning a ticket with `atlas jira users --query 'Alex' --project SDO` or `atlas jira users --query 'Alex' --issue SDO-588`. The scoped forms return users Jira considers assignable to that project or issue. Use `--site ALIAS` without a scope for a general lookup. Results include `account_id`, display name, and email when Jira permits it. Pass the ID to `jira create --assignee ID` or `jira edit KEY-1 --assignee ID`.
