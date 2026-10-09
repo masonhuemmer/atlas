@@ -89,7 +89,7 @@ func applyWriteGate(ns, verb string, flags map[string]any, optIn bool) map[strin
 func isWrite(ns, verb string) bool {
 	switch ns + " " + verb {
 	case "jira create", "jira edit", "jira comment", "jira transition", "jira link",
-		"confluence create", "confluence update",
+		"confluence create", "confluence update", "confluence move",
 		"pr create", "pr edit", "pr comment", "pr merge",
 		"jsm create", "jsm comment", "jsm transition":
 		return true

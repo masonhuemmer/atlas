@@ -36,7 +36,7 @@ func (c Confluence) Search(ctx context.Context, hostname, cql string) (domain.Pa
 	if err != nil {
 		return domain.PageSearchResult{}, err
 	}
-	u := joinURL(c.origin(hostname), "/wiki/rest/api/content/search?cql="+q(cql)+"&limit=25&expand=body.storage,space")
+	u := joinURL(c.origin(hostname), "/wiki/rest/api/content/search?cql="+q(cql)+"&limit=25&expand=body.storage,space,ancestors")
 	code, body, err := c.doJSON(ctx, http.MethodGet, u, cred, nil, nil)
 	if err != nil {
 		return domain.PageSearchResult{}, err
@@ -61,7 +61,7 @@ func (c Confluence) Create(ctx context.Context, hostname string, in domain.Creat
 		return domain.Page{}, err
 	}
 	preview := domain.Page{
-		Site: hostname, Space: in.Space, Title: in.Title, Body: storageBody,
+		Site: hostname, Space: in.Space, ParentID: in.ParentID, Title: in.Title, Body: storageBody,
 		ContentFormat: domain.StorageBodyFormat, Status: "current", Version: 1,
 	}
 	if dryRun {
@@ -75,6 +75,15 @@ func (c Confluence) Create(ctx context.Context, hostname string, in domain.Creat
 	if err != nil {
 		return domain.Page{}, err
 	}
+	if in.ParentID != "" {
+		parent, err := c.Get(ctx, hostname, in.ParentID)
+		if err != nil {
+			return domain.Page{}, err
+		}
+		if parent.Space != spaceID {
+			return domain.Page{}, domain.Usage("parent page must be in the requested space")
+		}
+	}
 	payload := map[string]any{
 		"spaceId": spaceID,
 		"status":  "current",
@@ -83,6 +92,9 @@ func (c Confluence) Create(ctx context.Context, hostname string, in domain.Creat
 			"representation": "storage",
 			"value":          storageBody,
 		},
+	}
+	if in.ParentID != "" {
+		payload["parentId"] = in.ParentID
 	}
 	u := joinURL(c.origin(hostname), "/wiki/api/v2/pages")
 	code, body, err := c.doJSON(ctx, http.MethodPost, u, cred, nil, payload)
@@ -97,6 +109,9 @@ func (c Confluence) Create(ctx context.Context, hostname string, in domain.Creat
 		p.Space = in.Space
 	}
 	p.Body = storageBody
+	if p.ParentID == "" {
+		p.ParentID = in.ParentID
+	}
 	return p, nil
 }
 
@@ -138,7 +153,53 @@ func (c Confluence) Update(ctx context.Context, hostname, pageID, body, bodyForm
 	}
 	p := pageFromREST(hostname, mustJSON(raw))
 	p.Body = storageBody
+	if p.ParentID == "" {
+		p.ParentID = cur.ParentID
+	}
 	return p, nil
+}
+
+func (c Confluence) Move(ctx context.Context, hostname, pageID, parentID string, dryRun bool) (domain.Page, error) {
+	if pageID == "" || parentID == "" || pageID == parentID {
+		return domain.Page{}, domain.Usage("move requires distinct page and parent IDs")
+	}
+	if dryRun {
+		return domain.Page{ID: pageID, Site: hostname, ParentID: parentID}, nil
+	}
+	source, err := c.Get(ctx, hostname, pageID)
+	if err != nil {
+		return domain.Page{}, err
+	}
+	parent, err := c.Get(ctx, hostname, parentID)
+	if err != nil {
+		return domain.Page{}, err
+	}
+	if source.Space != parent.Space {
+		return domain.Page{}, domain.Usage("page and parent must be in the same space")
+	}
+	if source.ParentID == parentID {
+		return source, nil
+	}
+	cred, err := c.credForHost(hostname)
+	if err != nil {
+		return domain.Page{}, err
+	}
+	u := joinURL(c.origin(hostname), "/wiki/rest/api/content/"+q(pageID)+"/move/append/"+q(parentID))
+	code, _, err := c.doJSON(ctx, http.MethodPut, u, cred, nil, nil)
+	if err != nil {
+		return domain.Page{}, err
+	}
+	if code != http.StatusOK {
+		if code == http.StatusBadRequest {
+			return domain.Page{}, domain.Usage("Confluence rejected the page move").WithHint("check that the parent is not a descendant of the page")
+		}
+		return domain.Page{}, MapConfluenceStatus(code)
+	}
+	moved, err := c.Get(ctx, hostname, pageID)
+	if err != nil || moved.ParentID != parentID {
+		return domain.Page{}, domain.Service("move was accepted but the new parent could not be verified").WithHint("check the page with atlas confluence get before retrying")
+	}
+	return moved, nil
 }
 
 func (c Confluence) lookupSpaceID(ctx context.Context, hostname, space string) (string, error) {
@@ -191,7 +252,7 @@ func pageFromREST(hostname string, m map[string]any) domain.Page {
 		}
 	}
 	p := domain.Page{
-		ID: id, Site: hostname, Space: space, Title: str(m, "title"),
+		ID: id, Site: hostname, Space: space, ParentID: str(m, "parentId"), Title: str(m, "title"),
 		Body: body, ContentFormat: domain.StorageBodyFormat, Status: str(m, "status"),
 		URL: domain.WikiPageURL(hostname, space, id), Version: ver,
 	}
@@ -204,6 +265,10 @@ func pageFromREST(hostname string, m map[string]any) domain.Page {
 func pageFromV1(hostname string, m map[string]any) domain.Page {
 	id := str(m, "id")
 	space := str(asMap(m["space"]), "key")
+	parentID := str(m, "parentId")
+	if ancestors := asList(m["ancestors"]); parentID == "" && len(ancestors) > 0 {
+		parentID = str(asMap(ancestors[len(ancestors)-1]), "id")
+	}
 	body := ""
 	if b := asMap(m["body"]); b != nil {
 		if st := asMap(b["storage"]); st != nil {
@@ -211,7 +276,7 @@ func pageFromV1(hostname string, m map[string]any) domain.Page {
 		}
 	}
 	return domain.Page{
-		ID: id, Site: hostname, Space: space, Title: str(m, "title"),
+		ID: id, Site: hostname, Space: space, ParentID: parentID, Title: str(m, "title"),
 		Body: body, ContentFormat: domain.StorageBodyFormat, Status: str(m, "status"),
 		URL: domain.WikiPageURL(hostname, space, id),
 	}

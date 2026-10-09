@@ -54,7 +54,7 @@ func TestMCPHelpTopics(t *testing.T) {
 	cs := connectMCP(t, d)
 	cases := map[string][]string{
 		"jira-search":      {"jira get KEY-1", "Never dual-query", "atlas jsm"},
-		"confluence-write": {"space = KEY", "write_opt_in"},
+		"confluence-write": {"space = KEY", "move PAGE_ID", "write_opt_in"},
 		"pr-review":        {"defaults.workspace", "pr edit", "pr merge", "No PR delete", "auth login --workspace"},
 		"jsm-customer":     {"jsm_customer", "public: true", "jsm desks"},
 	}
@@ -120,7 +120,7 @@ func TestMCPHelpNeverRunsVerb(t *testing.T) {
 		"auth":       {"status", "login", "logout"},
 		"site":       {"list", "resolve"},
 		"jira":       {"get", "search", "users", "create", "edit", "comment", "transition", "link"},
-		"confluence": {"get", "search", "create", "update"},
+		"confluence": {"get", "search", "create", "update", "move"},
 		"pr":         {"get", "list", "create", "edit", "comment", "merge", "diff"},
 		"jsm":        {"desks", "types", "list", "get", "create", "comment", "transition"},
 	}

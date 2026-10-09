@@ -82,18 +82,20 @@ Output: JSON (default) or --human.
 
 const confluenceHelp = `atlas confluence — licensed Confluence on one cloud
 
-Verbs: get, search, create, update
+Verbs: get, search, create, update, move
 get:    atlas confluence get <pageId> --site ALIAS
 search: atlas confluence search --cql 'space = KEY AND type = page'
-create: atlas confluence create --space KEY --title '...' --body '...'
+create: atlas confluence create --space KEY --title '...' --body '...' [--parent PAGE_ID]
 update: atlas confluence update <pageId> --body '...' [--site ALIAS]
+move:   atlas confluence move <pageId> --parent PAGE_ID [--site ALIAS]
 
 Space keys map to a site in config. Create/update convert Markdown to storage markup.
 Use --body-format storage for prepared Confluence XHTML. Get returns storage markup.
+Parent IDs are page IDs. Move places a page under another page in the same space.
 CQL that names a configured space infers that site; CQL with no space and no --site is usage.
 There is no delete verb.
 MCP writes dry-run unless write_opt_in is true.
-Live base: https://<hostname>/wiki/api/v2
+Live APIs: /wiki/api/v2/pages and /wiki/rest/api/content/{id}/move/append/{parentId}.
 Output: JSON (default) or --human.
 `
 

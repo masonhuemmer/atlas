@@ -43,6 +43,13 @@ func (c ConfluenceAPI) Update(ctx context.Context, hostname, pageID, body, bodyF
 	return c.Memory.UpdatePage(ctx, hostname, pageID, body, bodyFormat, dryRun)
 }
 
+func (c ConfluenceAPI) Move(ctx context.Context, hostname, pageID, parentID string, dryRun bool) (domain.Page, error) {
+	if c.Memory == nil {
+		return domain.Page{}, domain.Service("confluence memory not configured")
+	}
+	return c.Memory.MovePage(ctx, hostname, pageID, parentID, dryRun)
+}
+
 func (m *Memory) GetPage(_ context.Context, hostname, pageID string) (domain.Page, error) {
 	if m == nil {
 		return domain.Page{}, domain.Service("confluence memory not configured")
@@ -111,6 +118,7 @@ func (m *Memory) CreatePage(_ context.Context, hostname string, in domain.Create
 	preview := domain.Page{
 		Site:          hostname,
 		Space:         space,
+		ParentID:      in.ParentID,
 		Title:         title,
 		Body:          body,
 		ContentFormat: domain.StorageBodyFormat,
@@ -122,6 +130,15 @@ func (m *Memory) CreatePage(_ context.Context, hostname string, in domain.Create
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if in.ParentID != "" {
+		parent, ok := m.pages[memKey(hostname, in.ParentID)]
+		if !ok {
+			return domain.Page{}, domain.NotFound("parent page not found")
+		}
+		if parent.Space != space {
+			return domain.Page{}, domain.Usage("parent page must be in the requested space")
+		}
+	}
 	n := m.nextPage
 	if n == 0 {
 		n = 1
@@ -164,6 +181,40 @@ func (m *Memory) UpdatePage(_ context.Context, hostname, pageID, body, bodyForma
 	}
 	m.putPageLocked(next)
 	return clonePage(next), nil
+}
+
+func (m *Memory) MovePage(_ context.Context, hostname, pageID, parentID string, dryRun bool) (domain.Page, error) {
+	if m == nil {
+		return domain.Page{}, domain.Service("confluence memory not configured")
+	}
+	if pageID == "" || parentID == "" || pageID == parentID {
+		return domain.Page{}, domain.Usage("move requires distinct page and parent IDs")
+	}
+	if dryRun {
+		return domain.Page{ID: pageID, Site: hostname, ParentID: parentID}, nil
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	source, ok := m.pages[memKey(hostname, pageID)]
+	if !ok {
+		return domain.Page{}, domain.NotFound("page not found")
+	}
+	parent, ok := m.pages[memKey(hostname, parentID)]
+	if !ok {
+		return domain.Page{}, domain.NotFound("parent page not found")
+	}
+	if source.Space != parent.Space {
+		return domain.Page{}, domain.Usage("page and parent must be in the same space")
+	}
+	for ancestor := parent; ancestor.ParentID != ""; {
+		if ancestor.ParentID == pageID {
+			return domain.Page{}, domain.Usage("cannot move a page under its descendant")
+		}
+		ancestor = m.pages[memKey(hostname, ancestor.ParentID)]
+	}
+	source.ParentID = parentID
+	m.putPageLocked(source)
+	return clonePage(source), nil
 }
 
 // PageCount is the seeded plus persisted page count (tests).

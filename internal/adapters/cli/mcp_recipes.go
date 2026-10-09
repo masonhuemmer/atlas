@@ -19,9 +19,12 @@ Do not print tokens.
 
 Space keys map to a site in config. No delete verb.
 Create/update convert Markdown to storage markup. For prepared Confluence XHTML, pass body-format=storage.
+Use a page ID as parent. Move places an existing page under a parent in the same space.
 
   atlas confluence search --cql 'space = KEY AND type = page'
   atlas confluence create --space KEY --title '…' --body '…' --dry-run
+  atlas confluence create --space KEY --parent PAGE_ID --title '…' --body '…' --dry-run
+  atlas confluence move PAGE_ID --parent NEW_PARENT_ID --site ALIAS --dry-run
   atlas_write namespace=confluence verb=create flags space=KEY title=… body=…
 
 MCP writes dry-run unless write_opt_in is true.

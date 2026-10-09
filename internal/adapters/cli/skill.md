@@ -64,7 +64,8 @@ keys map to an alias. JQL/CQL that names two sites is usage. A
 | Comment / transition / link | `atlas_write` `jira` `comment` / `transition` / `link` |
 | Internal JSM note on a licensed site | `atlas_write` `namespace=jira` `verb=comment` `args=["KEY-1"]` `flags={body:"…",internal:true}` + `write_opt_in`; the key must resolve as a customer request |
 | Confluence get/search | `atlas_read` `confluence` `get` / `search` (`cql`); body is storage markup |
-| Confluence create/update | `atlas_write`; Markdown is converted to storage markup. Set `body-format:"storage"` for prepared Confluence XHTML; no delete |
+| Confluence create/update | `atlas_write`; create under a page with `flags={space:"KEY",parent:"PAGE_ID",title:"…",body:"…"}`. Markdown is converted to storage markup; set `body-format:"storage"` for prepared Confluence XHTML |
+| Move a Confluence page | `atlas_write` `namespace=confluence` `verb=move` `args=["PAGE_ID"]` `flags={parent:"NEW_PARENT_ID",site:"ALIAS"}` + `write_opt_in`; source and parent must be in the same space. No delete |
 | PR get/list/diff | `atlas_read` `pr` `get` / `list` / `diff` (`repo`, `id`) |
 | PR create/edit/comment/merge | `atlas_write`; edit an open PR's title or description with `namespace=pr` `verb=edit` `flags={repo:"SLUG",id:1,description:"…"}` + `write_opt_in`; no delete |
 | JSM desks/types/list/get | `atlas_read` `jsm` `desks` / `types` / `list` / `get` |
