@@ -46,7 +46,7 @@ func TestConfluenceUpdateConvertsMarkdownToStorage(t *testing.T) {
 	c, _ := liveClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case r.Method == http.MethodGet && r.URL.Path == "/wiki/api/v2/pages/456":
-			_ = json.NewEncoder(w).Encode(map[string]any{"id": "456", "spaceId": "123", "title": "Runbook", "version": map[string]any{"number": 2}, "body": map[string]any{"storage": map[string]any{"value": "<p>old</p>"}}})
+			_ = json.NewEncoder(w).Encode(map[string]any{"id": "456", "spaceId": "123", "parentId": "100", "title": "Runbook", "version": map[string]any{"number": 2}, "body": map[string]any{"storage": map[string]any{"value": "<p>old</p>"}}})
 		case r.Method == http.MethodPut && r.URL.Path == "/wiki/api/v2/pages/456":
 			updated = true
 			var payload map[string]any
@@ -70,7 +70,7 @@ func TestConfluenceUpdateConvertsMarkdownToStorage(t *testing.T) {
 	if err != nil || !updated {
 		t.Fatalf("update error %v, updated %v", err, updated)
 	}
-	if page.ContentFormat != domain.StorageBodyFormat || !strings.Contains(page.Body, "<h2>Steps</h2>") {
+	if page.ContentFormat != domain.StorageBodyFormat || page.ParentID != "100" || !strings.Contains(page.Body, "<h2>Steps</h2>") {
 		t.Fatalf("%+v", page)
 	}
 }

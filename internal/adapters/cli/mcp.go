@@ -98,7 +98,7 @@ func NewMCPServer(d Deps) *mcp.Server {
 	})
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "atlas_write",
-		Description: "Run one write CLI namespace+verb (create, edit, comment, transition, link, update, merge) with a flag map. Returns a dry-run preview unless write_opt_in is true. Refuses read verbs; use atlas_read. Skill: atlas://skill.",
+		Description: "Run one write CLI namespace+verb (create, edit, comment, transition, link, update, move, merge) with a flag map. Returns a dry-run preview unless write_opt_in is true. Refuses read verbs; use atlas_read. Skill: atlas://skill.",
 		Annotations: &mcp.ToolAnnotations{DestructiveHint: &yes, OpenWorldHint: &yes},
 	}, func(_ context.Context, _ *mcp.CallToolRequest, in writeIn) (*mcp.CallToolResult, any, error) {
 		args, err := buildWriteArgs(in.Namespace, in.Verb, in.Args, in.Flags, in.WriteOptIn)

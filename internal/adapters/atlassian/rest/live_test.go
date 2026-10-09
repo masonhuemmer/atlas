@@ -450,12 +450,15 @@ func TestConfluenceSearchLive(t *testing.T) {
 		if !strings.Contains(r.URL.Path, "/wiki/rest/api/content/search") {
 			t.Fatal(r.URL.Path)
 		}
+		if !strings.Contains(r.URL.Query().Get("expand"), "ancestors") {
+			t.Fatal(r.URL.String())
+		}
 		_ = json.NewEncoder(w).Encode(map[string]any{
-			"results": []any{map[string]any{"id": "100", "title": "Doc", "space": map[string]any{"key": "DOCS"}}},
+			"results": []any{map[string]any{"id": "100", "title": "Doc", "space": map[string]any{"key": "DOCS"}, "ancestors": []any{map[string]any{"id": "50"}}}},
 		})
 	}))
 	page, err := Confluence{Client: c}.Search(context.Background(), "dev.example.atlassian.net", `space = DOCS`)
-	if err != nil || page.Count != 1 || page.Items[0].Title != "Doc" {
+	if err != nil || page.Count != 1 || page.Items[0].Title != "Doc" || page.Items[0].ParentID != "50" {
 		t.Fatalf("%v %+v", err, page)
 	}
 }

@@ -21,8 +21,10 @@ func runConfluence(args []string, d Deps, format string) int {
 		return confluenceCreate(args, d, format)
 	case "update":
 		return confluenceUpdate(args, d, format)
+	case "move":
+		return confluenceMove(args, d, format)
 	default:
-		return fail(d, domain.Usagef("unknown confluence verb %q", verb).WithHint("atlas confluence get|search|create|update"))
+		return fail(d, domain.Usagef("unknown confluence verb %q", verb).WithHint("atlas confluence get|search|create|update|move"))
 	}
 }
 
@@ -96,6 +98,7 @@ func confluenceCreate(args []string, d Deps, format string) int {
 	fsset.SetOutput(d.Stderr)
 	siteFlag := fsset.String("site", "", "site alias, hostname, or UUID")
 	space := fsset.String("space", "", "space key or numeric spaceId")
+	parent := fsset.String("parent", "", "parent page ID")
 	title := fsset.String("title", "", "page title")
 	body := fsset.String("body", "", "page body")
 	bodyFormat := fsset.String("body-format", domain.DefaultBodyFormat, "markdown (default) or storage XHTML")
@@ -118,6 +121,7 @@ func confluenceCreate(args []string, d Deps, format string) int {
 	}
 	in := domain.CreatePage{
 		Space:      strings.ToUpper(strings.TrimSpace(*space)),
+		ParentID:   strings.TrimSpace(*parent),
 		Title:      strings.TrimSpace(*title),
 		Body:       *body,
 		BodyFormat: *bodyFormat,
@@ -132,6 +136,7 @@ func confluenceCreate(args []string, d Deps, format string) int {
 			Namespace: "confluence",
 			Verb:      "create",
 			Space:     in.Space,
+			ParentID:  in.ParentID,
 			Title:     in.Title,
 		})
 	}
@@ -183,11 +188,50 @@ func confluenceUpdate(args []string, d Deps, format string) int {
 	return success(d, format, page)
 }
 
+func confluenceMove(args []string, d Deps, format string) int {
+	if hasHelp(args) {
+		return writeHelp(d.Stdout, confluenceHelp)
+	}
+	fsset := flag.NewFlagSet("confluence move", flag.ContinueOnError)
+	fsset.SetOutput(d.Stderr)
+	siteFlag := fsset.String("site", "", "site alias, hostname, or UUID")
+	parent := fsset.String("parent", "", "new parent page ID")
+	dry := fsset.Bool("dry-run", false, "")
+	if err := parseMixed(fsset, args); err != nil {
+		return fail(d, domain.Usage(err.Error()))
+	}
+	pageID, parentID := strings.TrimSpace(fsset.Arg(0)), strings.TrimSpace(*parent)
+	if fsset.NArg() != 1 || pageID == "" || parentID == "" || pageID == parentID {
+		return fail(d, domain.Usage("move requires distinct page and --parent IDs").WithHint("atlas confluence move <pageId> --parent <parentPageId> --site ALIAS"))
+	}
+	site, err := domain.Resolve(domain.ResolveInput{Site: *siteFlag})
+	if err != nil {
+		return fail(d, err)
+	}
+	if err := refuseCustomerConfluence(site); err != nil {
+		return fail(d, err)
+	}
+	if d.Confluence == nil {
+		return fail(d, domain.Service("confluence adapter not configured"))
+	}
+	page, err := d.Confluence.Move(ctx(), site.Hostname, pageID, parentID, *dry)
+	if err != nil {
+		return fail(d, err)
+	}
+	if *dry {
+		return success(d, format, confluenceDryRun{
+			DryRun: true, Namespace: "confluence", Verb: "move", ID: pageID, ParentID: parentID,
+		})
+	}
+	return success(d, format, page)
+}
+
 type confluenceDryRun struct {
 	DryRun    bool   `json:"dry_run"`
 	Namespace string `json:"namespace"`
 	Verb      string `json:"verb"`
 	Space     string `json:"space,omitempty"`
+	ParentID  string `json:"parent_id,omitempty"`
 	Title     string `json:"title,omitempty"`
 	ID        string `json:"id,omitempty"`
 	Body      string `json:"body,omitempty"`

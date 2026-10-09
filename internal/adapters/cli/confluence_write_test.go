@@ -85,6 +85,79 @@ func TestConfluenceUpdatePersists(t *testing.T) {
 	}
 }
 
+func TestConfluenceCreateAndMoveUnderParent(t *testing.T) {
+	d, out, errw := testDeps()
+	code := Run([]string{"atlas", "confluence", "create", "--space", "CCAB", "--parent", "100", "--title", "Child", "--body", "keep"}, d)
+	if code != domain.ExitOK {
+		t.Fatal(code, errw.String())
+	}
+	var child domain.Page
+	if err := json.Unmarshal(out.Bytes(), &child); err != nil {
+		t.Fatal(err)
+	}
+	if child.ParentID != "100" || child.Body != "<p>keep</p>\n" {
+		t.Fatalf("%+v", child)
+	}
+	out.Reset()
+	errw.Reset()
+	code = Run([]string{"atlas", "confluence", "create", "--space", "CCAB", "--title", "New parent", "--body", "parent"}, d)
+	if code != domain.ExitOK {
+		t.Fatal(code, errw.String())
+	}
+	var parent domain.Page
+	if err := json.Unmarshal(out.Bytes(), &parent); err != nil {
+		t.Fatal(err)
+	}
+	out.Reset()
+	errw.Reset()
+	code = Run([]string{"atlas", "confluence", "move", child.ID, "--parent", parent.ID, "--site", "sesami-io", "--dry-run"}, d)
+	if code != domain.ExitOK {
+		t.Fatal(code, errw.String())
+	}
+	var preview map[string]any
+	if err := json.Unmarshal(out.Bytes(), &preview); err != nil {
+		t.Fatal(err)
+	}
+	if preview["dry_run"] != true || preview["parent_id"] != parent.ID {
+		t.Fatalf("%v", preview)
+	}
+	before, err := d.Confluence.Get(context.Background(), child.Site, child.ID)
+	if err != nil || before.ParentID != "100" {
+		t.Fatalf("%+v %v", before, err)
+	}
+	out.Reset()
+	errw.Reset()
+	code = Run([]string{"atlas", "confluence", "move", child.ID, "--parent", parent.ID, "--site", "sesami-io"}, d)
+	if code != domain.ExitOK {
+		t.Fatal(code, errw.String())
+	}
+	var moved domain.Page
+	if err := json.Unmarshal(out.Bytes(), &moved); err != nil {
+		t.Fatal(err)
+	}
+	if moved.ParentID != parent.ID || moved.Body != child.Body || moved.Title != child.Title {
+		t.Fatalf("%+v", moved)
+	}
+}
+
+func TestConfluenceMoveRejectsSelfAndDescendant(t *testing.T) {
+	d, out, errw := testDeps()
+	code := Run([]string{"atlas", "confluence", "create", "--space", "CCAB", "--parent", "100", "--title", "Child", "--body", "text"}, d)
+	if code != domain.ExitOK {
+		t.Fatal(code, errw.String())
+	}
+	var child domain.Page
+	if err := json.Unmarshal(out.Bytes(), &child); err != nil {
+		t.Fatal(err)
+	}
+	if code := Run([]string{"atlas", "confluence", "move", child.ID, "--parent", child.ID, "--site", "sesami-io"}, d); code != domain.ExitUsage {
+		t.Fatal(code, errw.String())
+	}
+	if code := Run([]string{"atlas", "confluence", "move", "100", "--parent", child.ID, "--site", "sesami-io"}, d); code != domain.ExitUsage {
+		t.Fatal(code, errw.String())
+	}
+}
+
 func TestConfluenceCreatePreparedStorage(t *testing.T) {
 	d, out, errw := testDeps()
 	body := `<ac:structured-macro ac:name="code" />`
@@ -213,5 +286,40 @@ func TestMCPConfluenceUpdateWriteGate(t *testing.T) {
 	}
 	if got.Body != "<p>opted in</p>\n" {
 		t.Fatalf("%+v", got)
+	}
+}
+
+func TestMCPConfluenceMoveWriteGate(t *testing.T) {
+	d, out, errw := testDeps()
+	code := Run([]string{"atlas", "confluence", "create", "--space", "CCAB", "--title", "Movable", "--body", "text"}, d)
+	if code != domain.ExitOK {
+		t.Fatal(code, errw.String())
+	}
+	var created domain.Page
+	if err := json.Unmarshal(out.Bytes(), &created); err != nil {
+		t.Fatal(err)
+	}
+	cs := connectMCP(t, d)
+	args := writeIn{Namespace: "confluence", Verb: "move", Args: []string{created.ID}, Flags: map[string]any{"parent": "100", "site": "sesami-io"}}
+	res, err := cs.CallTool(context.Background(), &mcp.CallToolParams{Name: "atlas_write", Arguments: args})
+	if err != nil || res.IsError {
+		t.Fatal(err, toolText(t, res))
+	}
+	var preview map[string]any
+	if err := json.Unmarshal([]byte(toolText(t, res)), &preview); err != nil || preview["dry_run"] != true {
+		t.Fatalf("%v %v", preview, err)
+	}
+	before, err := d.Confluence.Get(context.Background(), created.Site, created.ID)
+	if err != nil || before.ParentID != "" {
+		t.Fatalf("%+v %v", before, err)
+	}
+	args.WriteOptIn = true
+	res, err = cs.CallTool(context.Background(), &mcp.CallToolParams{Name: "atlas_write", Arguments: args})
+	if err != nil || res.IsError {
+		t.Fatal(err, toolText(t, res))
+	}
+	after, err := d.Confluence.Get(context.Background(), created.Site, created.ID)
+	if err != nil || after.ParentID != "100" {
+		t.Fatalf("%+v %v", after, err)
 	}
 }

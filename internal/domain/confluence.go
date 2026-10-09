@@ -12,6 +12,7 @@ type Page struct {
 	ID            string `json:"id"`
 	Site          string `json:"site"`
 	Space         string `json:"space"`
+	ParentID      string `json:"parent_id,omitempty"`
 	Title         string `json:"title"`
 	Body          string `json:"body,omitempty"`
 	ContentFormat string `json:"content_format,omitempty"`
@@ -32,6 +33,7 @@ type PageSearchResult struct {
 // BodyFormat defaults to markdown. Space accepts a space key or numeric id.
 type CreatePage struct {
 	Space      string
+	ParentID   string
 	Title      string
 	Body       string
 	BodyFormat string
