@@ -413,10 +413,34 @@ func (j Jira) Transition(ctx context.Context, hostname, key, name string, dryRun
 	if id == "" {
 		return domain.Issue{}, domain.Usagef("unknown transition %q", name).WithHint("atlas jira transition KEY --name NAME")
 	}
+	return j.applyTransitionID(ctx, hostname, key, id, dryRun)
+}
+
+func (j Jira) TransitionID(ctx context.Context, hostname, key, id string, dryRun bool) (domain.Issue, error) {
+	key = strings.ToUpper(strings.TrimSpace(key))
+	id = strings.TrimSpace(id)
+	transitions, err := j.Transitions(ctx, hostname, key, 0)
+	if err != nil {
+		return domain.Issue{}, err
+	}
+	for _, tr := range transitions.Items {
+		if tr.ID == id {
+			return j.applyTransitionID(ctx, hostname, key, id, dryRun)
+		}
+	}
+	return domain.Issue{}, domain.Usagef("unknown transition id %q", id)
+}
+
+func (j Jira) applyTransitionID(ctx context.Context, hostname, key, id string, dryRun bool) (domain.Issue, error) {
 	if dryRun {
 		return j.Get(ctx, hostname, key)
 	}
-	code, _, err = j.doJSON(ctx, http.MethodPost, u, cred, nil, map[string]any{"transition": map[string]any{"id": id}})
+	cred, err := j.credForHost(hostname)
+	if err != nil {
+		return domain.Issue{}, err
+	}
+	u := joinURL(j.origin(hostname), "/rest/api/3/issue/"+q(strings.ToUpper(strings.TrimSpace(key)))+"/transitions")
+	code, _, err := j.doJSON(ctx, http.MethodPost, u, cred, nil, map[string]any{"transition": map[string]any{"id": id}})
 	if err != nil {
 		return domain.Issue{}, err
 	}
@@ -463,6 +487,7 @@ func issueFromREST(hostname string, m map[string]any) domain.Issue {
 		Summary:     str(f, "summary"),
 		Description: markdownFromADF(f["description"]),
 		Status:      nestedName(f, "status"),
+		StatusID:    str(asMap(f["status"]), "id"),
 		IssueType:   nestedName(f, "issuetype"),
 		Parent:      str(asMap(f["parent"]), "key"),
 		Priority:    nestedName(f, "priority"),

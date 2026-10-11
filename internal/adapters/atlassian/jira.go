@@ -97,6 +97,10 @@ func (j JiraAPI) Transition(ctx context.Context, hostname, key, name string, dry
 	return j.Memory.Transition(ctx, hostname, key, name, dryRun)
 }
 
+func (j JiraAPI) TransitionID(ctx context.Context, hostname, key, id string, dryRun bool) (domain.Issue, error) {
+	return j.Transition(ctx, hostname, key, id, dryRun)
+}
+
 func (j JiraAPI) Link(ctx context.Context, hostname, inward, outward, linkType string, dryRun bool) error {
 	if j.Memory == nil {
 		return domain.Service("jira memory not configured")
@@ -196,6 +200,7 @@ func (m *Memory) Create(_ context.Context, hostname string, in domain.CreateIssu
 		Summary:     summary,
 		Description: in.Description,
 		Status:      "To Do",
+		StatusID:    "1",
 		IssueType:   issuetype,
 		Parent:      in.Parent,
 		Labels:      append([]string(nil), in.Labels...),
@@ -319,6 +324,7 @@ func (m *Memory) Transition(_ context.Context, hostname, key, name string, dryRu
 	}
 	next := cloneIssue(iss)
 	next.Status = statusForTransition(matched)
+	next.StatusID = fakeStatusID(next.Status)
 	if dryRun {
 		return next, nil
 	}

@@ -87,7 +87,7 @@ func NewMCPServer(d Deps) *mcp.Server {
 	}, handleHelp)
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "atlas_read",
-		Description: "Run one read CLI namespace+verb (get, search, users, list, diff, desks, types, site list/resolve, auth status) with a flag map. Returns that command's JSON. Refuses write verbs; use atlas_write. Lookup examples: help topics jira-search, confluence-write, pr-review, jsm-customer. Skill: atlas://skill.",
+		Description: "Run one read CLI namespace+verb (get, search, users, boards, board, transitions, list, diff, desks, types, site list/resolve, auth status) with a flag map. Returns that command's JSON. Refuses write verbs; use atlas_write. Lookup examples: help topics jira-search, confluence-write, pr-review, jsm-customer. Skill: atlas://skill.",
 		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true, IdempotentHint: true, OpenWorldHint: &yes},
 	}, func(_ context.Context, _ *mcp.CallToolRequest, in readIn) (*mcp.CallToolResult, any, error) {
 		args, err := buildReadArgs(in.Namespace, in.Verb, in.Args, in.Flags)

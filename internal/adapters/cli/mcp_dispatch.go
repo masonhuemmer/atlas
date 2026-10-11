@@ -102,7 +102,7 @@ func isWrite(ns, verb string) bool {
 func isRead(ns, verb string) bool {
 	switch ns + " " + verb {
 	case "auth status", "site list", "site resolve",
-		"jira get", "jira search", "jira users",
+		"jira get", "jira search", "jira users", "jira boards", "jira board", "jira transitions",
 		"confluence get", "confluence search",
 		"pr get", "pr list", "pr diff",
 		"jsm desks", "jsm types", "jsm list", "jsm get":
@@ -131,6 +131,9 @@ func checkRun(ns, verb string) error {
 func buildReadArgs(ns, verb string, pos []string, flags map[string]any) ([]string, error) {
 	if err := checkRun(ns, verb); err != nil {
 		return nil, err
+	}
+	if ns == "jira" && verb == "board" && (len(pos) != 2 || pos[0] != "placement") {
+		return nil, domain.Usage("atlas_read supports only jira board placement")
 	}
 	if !isRead(ns, verb) {
 		hint := "atlas_help lists each namespace's verbs"

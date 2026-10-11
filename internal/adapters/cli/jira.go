@@ -20,6 +20,12 @@ func runJira(args []string, d Deps, format string) int {
 		return jiraSearch(args, d, format)
 	case "users":
 		return jiraUsers(args, d, format)
+	case "boards":
+		return jiraBoards(args, d, format)
+	case "board":
+		return jiraBoard(args, d, format)
+	case "transitions":
+		return jiraTransitions(args, d, format)
 	case "create":
 		return jiraCreate(args, d, format)
 	case "edit":
@@ -340,6 +346,7 @@ func jiraTransition(args []string, d Deps, format string) int {
 	fsset.SetOutput(d.Stderr)
 	siteFlag := fsset.String("site", "", "site alias, hostname, or UUID")
 	name := fsset.String("name", "", "transition name (not id)")
+	id := fsset.String("id", "", "transition ID returned by atlas jira transitions")
 	dry := fsset.Bool("dry-run", false, "")
 	if err := parseMixed(fsset, args); err != nil {
 		return fail(d, domain.Usage(err.Error()))
@@ -348,8 +355,8 @@ func jiraTransition(args []string, d Deps, format string) int {
 	if strings.TrimSpace(key) == "" {
 		return fail(d, domain.Usage("issue key is required").WithHint("atlas jira transition KEY-1 --name Done"))
 	}
-	if strings.TrimSpace(*name) == "" {
-		return fail(d, domain.Usage("transition requires --name").WithHint("atlas jira transition KEY-1 --name Done"))
+	if (strings.TrimSpace(*name) == "") == (strings.TrimSpace(*id) == "") {
+		return fail(d, domain.Usage("transition requires exactly one of --name or --id").WithHint("atlas jira transition KEY-1 --name Done"))
 	}
 	site, err := domain.Resolve(domain.ResolveInput{Site: *siteFlag, Issue: key})
 	if err != nil {
@@ -361,7 +368,12 @@ func jiraTransition(args []string, d Deps, format string) int {
 	if d.Jira == nil {
 		return fail(d, domain.Service("jira adapter not configured"))
 	}
-	iss, err := d.Jira.Transition(ctx(), site.Hostname, key, *name, *dry)
+	var iss domain.Issue
+	if *id != "" {
+		iss, err = d.Jira.TransitionID(ctx(), site.Hostname, key, *id, *dry)
+	} else {
+		iss, err = d.Jira.Transition(ctx(), site.Hostname, key, *name, *dry)
+	}
 	if err != nil {
 		return fail(d, err)
 	}
@@ -372,6 +384,7 @@ func jiraTransition(args []string, d Deps, format string) int {
 			Verb:      "transition",
 			Key:       strings.ToUpper(strings.TrimSpace(key)),
 			Name:      strings.TrimSpace(*name),
+			ID:        strings.TrimSpace(*id),
 		})
 	}
 	return success(d, format, iss)
@@ -458,6 +471,7 @@ type jiraDryRun struct {
 	Summary   string `json:"summary,omitempty"`
 	Key       string `json:"key,omitempty"`
 	Name      string `json:"name,omitempty"`
+	ID        string `json:"id,omitempty"`
 	Body      string `json:"body,omitempty"`
 	Inward    string `json:"inward,omitempty"`
 	Outward   string `json:"outward,omitempty"`
