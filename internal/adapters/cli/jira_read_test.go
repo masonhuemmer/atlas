@@ -76,6 +76,35 @@ func TestJiraSearchCABHitsSesamiIOOnly(t *testing.T) {
 	}
 }
 
+func TestJiraSuggestReturnsPickerItems(t *testing.T) {
+	d, out, errw := testDeps()
+	code := Run([]string{"atlas", "jira", "suggest", "--query", "SDO", "--project", "SDO"}, d)
+	if code != domain.ExitOK {
+		t.Fatal(code, errw.String())
+	}
+	var result domain.IssueSuggestions
+	if err := json.Unmarshal(out.Bytes(), &result); err != nil {
+		t.Fatal(err)
+	}
+	if result.Project != "SDO" || len(result.Items) == 0 || !strings.HasPrefix(result.Items[0].Key, "SDO-") {
+		t.Fatalf("%+v", result)
+	}
+}
+
+func TestJiraSearchRejectsInvalidPageLimit(t *testing.T) {
+	d, _, _ := testDeps()
+	if code := Run([]string{"atlas", "jira", "search", "--jql", "project = SDO", "--limit", "101"}, d); code != domain.ExitUsage {
+		t.Fatalf("exit %d", code)
+	}
+}
+
+func TestJiraSuggestRejectsJQLInProject(t *testing.T) {
+	d, _, _ := testDeps()
+	if code := Run([]string{"atlas", "jira", "suggest", "--query", "a", "--project", "SDO OR project = CAB"}, d); code != domain.ExitUsage {
+		t.Fatalf("exit %d", code)
+	}
+}
+
 func TestJiraSearchCrossCloudJQLIsUsage(t *testing.T) {
 	d, _, errw := testDeps()
 	code := Run([]string{"atlas", "jira", "search", "--jql", "project in (SDO, CAB)"}, d)

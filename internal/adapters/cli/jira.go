@@ -3,6 +3,7 @@ package cli
 import (
 	"encoding/json"
 	"flag"
+	"regexp"
 	"strings"
 
 	"github.com/masonhuemmer/atlas/internal/domain"
@@ -18,6 +19,8 @@ func runJira(args []string, d Deps, format string) int {
 		return jiraGet(args, d, format)
 	case "search":
 		return jiraSearch(args, d, format)
+	case "suggest":
+		return jiraSuggest(args, d, format)
 	case "users":
 		return jiraUsers(args, d, format)
 	case "boards":
@@ -80,6 +83,8 @@ func jiraSearch(args []string, d Deps, format string) int {
 	fsset.SetOutput(d.Stderr)
 	siteFlag := fsset.String("site", "", "site alias, hostname, or UUID")
 	jql := fsset.String("jql", "", "JQL (one site only)")
+	limit := fsset.Int("limit", 50, "results per page (1..100)")
+	pageToken := fsset.String("page-token", "", "opaque token from the previous page")
 	if err := parseMixed(fsset, args); err != nil {
 		return fail(d, domain.Usage(err.Error()))
 	}
@@ -93,14 +98,54 @@ func jiraSearch(args []string, d Deps, format string) int {
 	if strings.TrimSpace(*jql) == "" {
 		return fail(d, domain.Usage("search requires --jql").WithHint("atlas jira search --jql 'project = KEY'"))
 	}
+	if *limit < 1 || *limit > 100 {
+		return fail(d, domain.Usage("search --limit must be 1..100"))
+	}
 	if d.Jira == nil {
 		return fail(d, domain.Service("jira adapter not configured"))
 	}
-	page, err := d.Jira.Search(ctx(), site.Hostname, *jql)
+	page, err := d.Jira.SearchPage(ctx(), site.Hostname, *jql, *limit, *pageToken)
 	if err != nil {
 		return fail(d, err)
 	}
 	return success(d, format, page)
+}
+
+var jiraProjectKey = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9]+$`)
+
+func jiraSuggest(args []string, d Deps, format string) int {
+	if hasHelp(args) {
+		return writeHelp(d.Stdout, jiraHelp)
+	}
+	fsset := flag.NewFlagSet("jira suggest", flag.ContinueOnError)
+	fsset.SetOutput(d.Stderr)
+	siteFlag := fsset.String("site", "", "site alias, hostname, or UUID")
+	query := fsset.String("query", "", "issue key or summary text")
+	project := fsset.String("project", "", "project key to narrow suggestions")
+	if err := parseMixed(fsset, args); err != nil {
+		return fail(d, domain.Usage(err.Error()))
+	}
+	if strings.TrimSpace(*query) == "" {
+		return fail(d, domain.Usage("suggest requires --query"))
+	}
+	if *project != "" && !jiraProjectKey.MatchString(*project) {
+		return fail(d, domain.Usage("suggest --project must be a project key"))
+	}
+	site, err := domain.Resolve(domain.ResolveInput{Site: *siteFlag, Project: *project})
+	if err != nil {
+		return fail(d, err)
+	}
+	if err := refuseCustomerJira(site); err != nil {
+		return fail(d, err)
+	}
+	if d.Jira == nil {
+		return fail(d, domain.Service("jira adapter not configured"))
+	}
+	result, err := d.Jira.Suggest(ctx(), site.Hostname, strings.TrimSpace(*query), strings.ToUpper(*project))
+	if err != nil {
+		return fail(d, err)
+	}
+	return success(d, format, result)
 }
 
 func jiraUsers(args []string, d Deps, format string) int {

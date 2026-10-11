@@ -40,14 +40,21 @@ func (j Jira) Get(ctx context.Context, hostname, key string) (domain.Issue, erro
 }
 
 func (j Jira) Search(ctx context.Context, hostname, jql string) (domain.SearchResult, error) {
+	return j.SearchPage(ctx, hostname, jql, 50, "")
+}
+
+func (j Jira) SearchPage(ctx context.Context, hostname, jql string, limit int, pageToken string) (domain.SearchResult, error) {
 	cred, err := j.credForHost(hostname)
 	if err != nil {
 		return domain.SearchResult{}, err
 	}
 	payload := map[string]any{
 		"jql":        jql,
-		"maxResults": 50,
+		"maxResults": limit,
 		"fields":     []string{"id", "key"},
+	}
+	if pageToken != "" {
+		payload["nextPageToken"] = pageToken
 	}
 	postURL := joinURL(j.origin(hostname), "/rest/api/3/search/jql")
 	code, body, err := j.doJSON(ctx, http.MethodPost, postURL, cred, nil, payload)
@@ -62,8 +69,11 @@ func (j Jira) Search(ctx context.Context, hostname, jql string) (domain.SearchRe
 	if code != http.StatusOK || len(items) == 0 {
 		vals := url.Values{}
 		vals.Set("jql", jql)
-		vals.Set("maxResults", "50")
+		vals.Set("maxResults", strconv.Itoa(limit))
 		vals.Set("fields", "id,key")
+		if pageToken != "" {
+			vals.Set("nextPageToken", pageToken)
+		}
 		getURL := joinURL(j.origin(hostname), "/rest/api/3/search/jql") + "?" + vals.Encode()
 		code, body, err = j.doJSON(ctx, http.MethodGet, getURL, cred, nil, nil)
 		if err != nil {
@@ -76,7 +86,56 @@ func (j Jira) Search(ctx context.Context, hostname, jql string) (domain.SearchRe
 		items = issuesFromSearch(hostname, parsed)
 	}
 	items = j.hydrateSearch(ctx, hostname, items)
-	return domain.SearchResult{JQL: jql, Site: hostname, Count: len(items), Items: items}, nil
+	next := str(parsed, "nextPageToken")
+	isLast, ok := parsed["isLast"].(bool)
+	if !ok {
+		isLast = next == ""
+	}
+	return domain.SearchResult{JQL: jql, Site: hostname, Count: len(items), Items: items, NextPageToken: next, IsLast: isLast}, nil
+}
+
+func (j Jira) Suggest(ctx context.Context, hostname, query, project string) (domain.IssueSuggestions, error) {
+	cred, err := j.credForHost(hostname)
+	if err != nil {
+		return domain.IssueSuggestions{}, err
+	}
+	params := url.Values{"query": {query}}
+	if project != "" {
+		params.Set("currentJQL", "project = "+project)
+	}
+	u := joinURL(j.origin(hostname), "/rest/api/3/issue/picker") + "?" + params.Encode()
+	code, body, err := j.doJSON(ctx, http.MethodGet, u, cred, nil, nil)
+	if err != nil {
+		return domain.IssueSuggestions{}, err
+	}
+	if code != http.StatusOK {
+		return domain.IssueSuggestions{}, MapStatus(code)
+	}
+	sections, ok := mustJSON(body)["sections"].([]any)
+	if !ok {
+		return domain.IssueSuggestions{}, domain.Service("Jira issue picker returned invalid JSON")
+	}
+	result := domain.IssueSuggestions{Site: hostname, Query: query, Project: project, Items: []domain.IssueSuggestion{}}
+	seen := map[string]bool{}
+	for _, rawSection := range sections {
+		section, ok := rawSection.(map[string]any)
+		if !ok {
+			continue
+		}
+		for _, rawIssue := range asList(section["issues"]) {
+			issue, ok := rawIssue.(map[string]any)
+			if !ok {
+				continue
+			}
+			key := str(issue, "key")
+			if key == "" || seen[key] || (project != "" && !strings.HasPrefix(strings.ToUpper(key), project+"-")) {
+				continue
+			}
+			seen[key] = true
+			result.Items = append(result.Items, domain.IssueSuggestion{Key: key, Summary: str(issue, "summaryText")})
+		}
+	}
+	return result, nil
 }
 
 func (j Jira) SearchUsers(ctx context.Context, hostname, query, project, issue string) (domain.UserSearchResult, error) {
