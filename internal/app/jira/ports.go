@@ -10,6 +10,8 @@ import (
 type Store interface {
 	Get(ctx context.Context, hostname, key string) (domain.Issue, error)
 	Search(ctx context.Context, hostname, jql string) (domain.SearchResult, error)
+	SearchPage(ctx context.Context, hostname, jql string, limit int, pageToken string) (domain.SearchResult, error)
+	Suggest(ctx context.Context, hostname, query, project string) (domain.IssueSuggestions, error)
 	SearchUsers(ctx context.Context, hostname, query, project, issue string) (domain.UserSearchResult, error)
 	Boards(ctx context.Context, hostname, project string) ([]domain.Board, error)
 	Placement(ctx context.Context, hostname, key string, boardID int) (domain.BoardPlacement, error)

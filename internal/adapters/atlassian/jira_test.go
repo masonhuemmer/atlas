@@ -32,6 +32,19 @@ func TestMemoryGetAndSearchIsolation(t *testing.T) {
 	}
 }
 
+func TestMemorySearchPageAdvances(t *testing.T) {
+	mem := Seed()
+	mem.put(domain.Issue{Key: "SDO-2", Site: host("sesamidevel"), Project: "SDO", Summary: "Second"})
+	first, err := mem.SearchPage(context.Background(), host("sesamidevel"), "project = SDO", 1, "")
+	if err != nil || first.Count != 1 || first.IsLast || first.NextPageToken == "" {
+		t.Fatalf("first page %+v: %v", first, err)
+	}
+	second, err := mem.SearchPage(context.Background(), host("sesamidevel"), "project = SDO", 1, first.NextPageToken)
+	if err != nil || second.Count != 1 || !second.IsLast || second.Items[0].Key == first.Items[0].Key {
+		t.Fatalf("second page %+v: %v", second, err)
+	}
+}
+
 func TestMemoryInternalCommentStaysPrivate(t *testing.T) {
 	mem := Seed()
 	hostname := host("sesamidevel")

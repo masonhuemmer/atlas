@@ -7,7 +7,7 @@ Usage: atlas <namespace> <verb> [flags]
 Namespaces:
   auth         sign in, status, logout (core, not a workload)
   site         list and resolve clouds from config
-  jira         get, search, users, boards, board, transitions, create, edit, comment, transition, link
+  jira         get, search, suggest, users, boards, board, transitions, create, edit, comment, transition, link
   confluence   get, search, create, update (no delete)
   pr           get, list, create, edit, comment, merge, diff (no delete)
   jsm          customer REST: desks, types, list, get, create, comment, transition
@@ -46,9 +46,10 @@ Output: JSON (default) or --human.
 
 const jiraHelp = `atlas jira — licensed Jira on one cloud
 
-Verbs: get, search, users, boards, board, transitions, create, edit, comment, transition, link
+Verbs: get, search, suggest, users, boards, board, transitions, create, edit, comment, transition, link
 get:        atlas jira get KEY-1
-search:     atlas jira search --jql 'project = KEY' [--site ALIAS]
+search:     atlas jira search --jql 'project = KEY' [--limit 50] [--page-token TOKEN]
+suggest:    atlas jira suggest --query 'text' [--project KEY] [--site ALIAS]
 users:      atlas jira users --query 'Alex' --project KEY
             atlas jira users --query 'alex@example.com' --issue KEY-1
             atlas jira users --query 'Alex' --site ALIAS

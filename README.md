@@ -94,7 +94,7 @@ atlas <namespace> <verb> [flags]
 | --- | --- |
 | `auth` | `login`, `status`, `logout` |
 | `site` | `list`, `resolve` |
-| `jira` | `get`, `search`, `users`, `boards`, `board placement`, `transitions`, `create`, `edit`, `comment`, `transition`, `link` |
+| `jira` | `get`, `search`, `suggest`, `users`, `boards`, `board placement`, `transitions`, `create`, `edit`, `comment`, `transition`, `link` |
 | `confluence` | `get`, `search`, `create`, `update`, `move` |
 | `pr` | `get`, `list`, `create`, `comment`, `merge`, `diff` |
 | `jsm` | `desks`, `types`, `list`, `get`, `create`, `comment`, `transition` |
@@ -108,6 +108,8 @@ Use `--parent PAGE_ID` to create a child page, or `atlas confluence move PAGE_ID
 For an internal note on a JSM customer request at a licensed site, use `atlas jira comment KEY-1 --body '...' --internal`. Atlas checks that the request is accessible, posts with internal visibility, and verifies the response. It never falls back to a public comment. `--dry-run` previews the command without checking site access.
 
 Find an account ID before assigning a ticket with `atlas jira users --query 'Alex' --project SDO` or `atlas jira users --query 'Alex' --issue SDO-588`. The scoped forms return users Jira considers assignable to that project or issue. Use `--site ALIAS` without a scope for a general lookup. Results include `account_id`, display name, and email when Jira permits it. Pass the ID to `jira create --assignee ID` or `jira edit KEY-1 --assignee ID`.
+
+For an interactive issue picker, use `atlas jira suggest --query 'provision' --project SDO` to get Jira's key and summary suggestions. `atlas jira search --jql 'project = SDO ORDER BY updated DESC' --limit 50` returns `next_page_token` when another page is available; pass it with `--page-token TOKEN` to continue. The search limit is 1–100 per page.
 
 Find a board with `atlas jira boards --project SDO`, then run `atlas jira board placement SDO-588 --board 423` for its exact column. Placement reports `in_column`, `not_on_board`, or `unmapped_status` and keeps the underlying Jira status separate. `atlas jira transitions SDO-588 --board 423` lists available transition IDs with destination column previews; use `atlas jira transition SDO-588 --id ID` to select one unambiguously.
 

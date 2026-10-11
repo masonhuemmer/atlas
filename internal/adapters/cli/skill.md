@@ -56,6 +56,7 @@ keys map to an alias. JQL/CQL that names two sites is usage. A
 | Help / recipe | `atlas_help` `topic=jira-search` (or namespace/verb) |
 | Get issue | `atlas_read` `namespace=jira` `verb=get` `args=["KEY-1"]` |
 | Search Jira | `atlas_read` `namespace=jira` `verb=search` `flags={jql:"project = KEY"}` |
+| Suggest Jira issues for a picker | `atlas_read` `namespace=jira` `verb=suggest` `flags={query:"text",project:"KEY"}`; returns keys and plain summaries |
 | Find exact Jira board column | Follow **Board placement** below |
 | Find and assign a Jira user | Follow **Assign a Jira issue** below |
 | Create issue | `atlas_write` `namespace=jira` `verb=create` `flags={project,type,summary}` + `write_opt_in` |

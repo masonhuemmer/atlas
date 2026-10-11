@@ -55,6 +55,20 @@ func (j JiraAPI) Search(ctx context.Context, hostname, jql string) (domain.Searc
 	return j.Memory.Search(ctx, hostname, jql)
 }
 
+func (j JiraAPI) SearchPage(ctx context.Context, hostname, jql string, limit int, pageToken string) (domain.SearchResult, error) {
+	if j.Memory == nil {
+		return domain.SearchResult{}, domain.Service("jira memory not configured")
+	}
+	return j.Memory.SearchPage(ctx, hostname, jql, limit, pageToken)
+}
+
+func (j JiraAPI) Suggest(ctx context.Context, hostname, query, project string) (domain.IssueSuggestions, error) {
+	if j.Memory == nil {
+		return domain.IssueSuggestions{}, domain.Service("jira memory not configured")
+	}
+	return j.Memory.Suggest(ctx, hostname, query, project)
+}
+
 func (j JiraAPI) SearchUsers(ctx context.Context, hostname, query, project, issue string) (domain.UserSearchResult, error) {
 	if j.Memory == nil {
 		return domain.UserSearchResult{}, domain.Service("jira memory not configured")
@@ -149,7 +163,50 @@ func (m *Memory) Search(_ context.Context, hostname, jql string) (domain.SearchR
 		items = append(items, cloneIssue(iss))
 	}
 	sort.Slice(items, func(i, j int) bool { return items[i].Key < items[j].Key })
-	return domain.SearchResult{JQL: jql, Site: hostname, Count: len(items), Items: items}, nil
+	return domain.SearchResult{JQL: jql, Site: hostname, Count: len(items), Items: items, IsLast: true}, nil
+}
+
+func (m *Memory) SearchPage(ctx context.Context, hostname, jql string, limit int, pageToken string) (domain.SearchResult, error) {
+	page, err := m.Search(ctx, hostname, jql)
+	if err != nil {
+		return page, err
+	}
+	start := 0
+	if pageToken != "" {
+		start, err = strconv.Atoi(pageToken)
+		if err != nil || start < 0 || start > len(page.Items) {
+			return domain.SearchResult{}, domain.Usage("invalid search page token")
+		}
+	}
+	if limit <= 0 || limit > 100 {
+		return domain.SearchResult{}, domain.Usage("search limit must be 1..100")
+	}
+	total := len(page.Items)
+	end := start + limit
+	if end > total {
+		end = total
+	}
+	page.Items = page.Items[start:end]
+	page.Count = len(page.Items)
+	page.IsLast = end == total
+	if !page.IsLast {
+		page.NextPageToken = strconv.Itoa(end)
+	}
+	return page, nil
+}
+
+func (m *Memory) Suggest(ctx context.Context, hostname, query, project string) (domain.IssueSuggestions, error) {
+	page, err := m.Search(ctx, hostname, "project = "+project)
+	if err != nil {
+		return domain.IssueSuggestions{}, err
+	}
+	result := domain.IssueSuggestions{Site: hostname, Query: query, Project: project, Items: []domain.IssueSuggestion{}}
+	for _, issue := range page.Items {
+		if strings.Contains(strings.ToLower(issue.Key+" "+issue.Summary), strings.ToLower(query)) {
+			result.Items = append(result.Items, domain.IssueSuggestion{Key: issue.Key, Summary: issue.Summary})
+		}
+	}
+	return result, nil
 }
 
 func (m *Memory) SearchUsers(_ context.Context, hostname, query, project, issue string) (domain.UserSearchResult, error) {

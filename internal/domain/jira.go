@@ -36,10 +36,25 @@ type Issue struct {
 
 // SearchResult is one-site JQL output. Items use the default search fields.
 type SearchResult struct {
-	JQL   string  `json:"jql"`
-	Site  string  `json:"site"`
-	Count int     `json:"count"`
-	Items []Issue `json:"items"`
+	JQL           string  `json:"jql"`
+	Site          string  `json:"site"`
+	Count         int     `json:"count"`
+	Items         []Issue `json:"items"`
+	NextPageToken string  `json:"next_page_token,omitempty"`
+	IsLast        bool    `json:"is_last"`
+}
+
+// IssueSuggestions are Jira's issue-picker matches for interactive search.
+type IssueSuggestions struct {
+	Site    string            `json:"site"`
+	Query   string            `json:"query"`
+	Project string            `json:"project,omitempty"`
+	Items   []IssueSuggestion `json:"items"`
+}
+
+type IssueSuggestion struct {
+	Key     string `json:"key"`
+	Summary string `json:"summary"`
 }
 
 // CreateIssue is the REST field set we own for atlas jira create.

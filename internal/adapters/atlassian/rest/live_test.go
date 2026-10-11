@@ -263,6 +263,41 @@ func TestJiraSearchHydratesIDOnlyHits(t *testing.T) {
 	}
 }
 
+func TestJiraSearchPagePassesTokenAndReturnsNextPage(t *testing.T) {
+	c, _ := liveClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatal(err)
+		}
+		if body["maxResults"] != float64(2) || body["nextPageToken"] != "next-1" {
+			t.Fatalf("search request: %#v", body)
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"issues": []any{map[string]any{
+			"key": "ABC-3", "fields": map[string]any{"summary": "Third", "project": map[string]any{"key": "ABC"}},
+		}}, "nextPageToken": "next-2", "isLast": false})
+	}))
+	page, err := (Jira{Client: c}).SearchPage(context.Background(), "dev.example.atlassian.net", "project = ABC", 2, "next-1")
+	if err != nil || page.Count != 1 || page.Items[0].Key != "ABC-3" || page.NextPageToken != "next-2" || page.IsLast {
+		t.Fatalf("page %+v: %v", page, err)
+	}
+}
+
+func TestJiraSuggestUsesIssuePickerAndPlainSummaries(t *testing.T) {
+	c, _ := liveClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet || r.URL.Path != "/rest/api/3/issue/picker" || r.URL.Query().Get("query") != "prov" || r.URL.Query().Get("currentJQL") != "project = ABC" {
+			t.Fatalf("picker request %s %s", r.Method, r.URL)
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"sections": []any{
+			map[string]any{"issues": []any{map[string]any{"key": "ABC-1", "summary": "<b>Bad</b>", "summaryText": "Plain summary"}, map[string]any{"key": "OTHER-2", "summaryText": "Other"}}},
+			map[string]any{"issues": []any{map[string]any{"key": "ABC-1", "summaryText": "Duplicate"}, map[string]any{"key": "ABC-3", "summaryText": "Third"}}},
+		}})
+	}))
+	result, err := (Jira{Client: c}).Suggest(context.Background(), "dev.example.atlassian.net", "prov", "ABC")
+	if err != nil || len(result.Items) != 2 || result.Items[0].Summary != "Plain summary" || result.Items[1].Key != "ABC-3" {
+		t.Fatalf("suggestions %+v: %v", result, err)
+	}
+}
+
 func TestJiraCreateDryRunDoesNotPOST(t *testing.T) {
 	hit := false
 	c, _ := liveClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
