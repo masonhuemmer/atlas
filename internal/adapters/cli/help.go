@@ -7,7 +7,7 @@ Usage: atlas <namespace> <verb> [flags]
 Namespaces:
   auth         sign in, status, logout (core, not a workload)
   site         list and resolve clouds from config
-  jira         get, search, users, create, edit, comment, transition, link on one site
+  jira         get, search, users, boards, board, transitions, create, edit, comment, transition, link
   confluence   get, search, create, update (no delete)
   pr           get, list, create, edit, comment, merge, diff (no delete)
   jsm          customer REST: desks, types, list, get, create, comment, transition
@@ -46,18 +46,21 @@ Output: JSON (default) or --human.
 
 const jiraHelp = `atlas jira — licensed Jira on one cloud
 
-Verbs: get, search, users, create, edit, comment, transition, link
+Verbs: get, search, users, boards, board, transitions, create, edit, comment, transition, link
 get:        atlas jira get KEY-1
 search:     atlas jira search --jql 'project = KEY' [--site ALIAS]
 users:      atlas jira users --query 'Alex' --project KEY
             atlas jira users --query 'alex@example.com' --issue KEY-1
             atlas jira users --query 'Alex' --site ALIAS
+boards:     atlas jira boards --project KEY [--site ALIAS]
+placement:  atlas jira board placement KEY-1 --board 123 [--site ALIAS]
+transitions: atlas jira transitions KEY-1 [--board 123]
 create:     atlas jira create --project KEY --type Task --summary '...'
 create sub-task: atlas jira create --project KEY --type Sub-task --summary '...' --parent KEY-1
 edit:       atlas jira edit SUBTASK-2 --parent KEY-1  (or --fields '{...}')
 assign:     atlas jira edit KEY-1 --assignee ACCOUNT_ID
 comment:    atlas jira comment KEY-1 --body '...' [--internal]
-transition: atlas jira transition KEY-1 --name Done
+transition: atlas jira transition KEY-1 --name Done (or --id from jira transitions)
 link:       atlas jira link KEY-1 OTHER-2 [--type Relates]
 
 Project keys map to a site in config. Combined JQL that names two sites is usage.

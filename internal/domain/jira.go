@@ -20,6 +20,7 @@ type Issue struct {
 	Summary     string      `json:"summary"`
 	Description string      `json:"description,omitempty"`
 	Status      string      `json:"status"`
+	StatusID    string      `json:"status_id,omitempty"`
 	IssueType   string      `json:"issuetype"`
 	Parent      string      `json:"parent,omitempty"`
 	Priority    string      `json:"priority,omitempty"`

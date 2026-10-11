@@ -56,6 +56,7 @@ keys map to an alias. JQL/CQL that names two sites is usage. A
 | Help / recipe | `atlas_help` `topic=jira-search` (or namespace/verb) |
 | Get issue | `atlas_read` `namespace=jira` `verb=get` `args=["KEY-1"]` |
 | Search Jira | `atlas_read` `namespace=jira` `verb=search` `flags={jql:"project = KEY"}` |
+| Find exact Jira board column | Follow **Board placement** below |
 | Find and assign a Jira user | Follow **Assign a Jira issue** below |
 | Create issue | `atlas_write` `namespace=jira` `verb=create` `flags={project,type,summary}` + `write_opt_in` |
 | Create sub-task under story | `atlas_write` `namespace=jira` `verb=create` `flags={project,type:"Sub-task",summary,parent:"KEY-1"}` + `write_opt_in` |
@@ -82,6 +83,12 @@ keys map to an alias. JQL/CQL that names two sites is usage. A
 ## Jira descriptions
 
 When creating an issue, pass Markdown in the `description` flag. When editing one, pass a Markdown string as `description` inside the `fields` JSON object. Atlas converts those strings to Jira rich text on write. Read the issue with `jira get` afterward to check the stored description.
+
+## Board placement
+
+1. List candidate boards with `atlas_read` `namespace=jira` `verb=boards` `flags={project:"KEY"}`. Select the intended board ID; an issue can appear on multiple boards.
+2. Read `atlas_read` `namespace=jira` `verb=board` `args=["placement","KEY-1"]` `flags={board:BOARD_ID}`. Use `column` only when `state` is `in_column`; report `not_on_board` and `unmapped_status` as distinct outcomes. A failed read leaves placement unknown.
+3. To move the issue, read `atlas_read` `namespace=jira` `verb=transitions` `args=["KEY-1"]` `flags={board:BOARD_ID}`. Select the desired transition ID and its destination column, then call `atlas_write` `namespace=jira` `verb=transition` `args=["KEY-1"]` `flags={id:"TRANSITION_ID"}` with `write_opt_in=true` when authorized. Refresh board placement afterward.
 
 ## Preflight
 

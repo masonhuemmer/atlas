@@ -119,7 +119,7 @@ func Seed() *Memory {
 		item := domain.Issue{
 			Key: iss.Key, Site: host, BrowseURL: domain.BrowseURL(host, iss.Key),
 			Summary: iss.Summary, Description: iss.Description,
-			Status: iss.Status, IssueType: iss.IssueType, Priority: iss.Priority,
+			Status: iss.Status, StatusID: fakeStatusID(iss.Status), IssueType: iss.IssueType, Priority: iss.Priority,
 			Labels: iss.Labels, Assignee: iss.Assignee, Reporter: iss.Reporter,
 			Created: iss.Created, Updated: iss.Updated, Project: iss.Project,
 		}
