@@ -53,7 +53,7 @@ Missing config without `ATLAS_FAKE=1` is usage (exit 3).
 
 ## Auth
 
-Per-site Basic `email:token` in the macOS keychain (file fallback if needed). Login stays in a terminal. Jira, Confluence, and JSM use `--site`. Bitbucket PRs use a **separate** workspace token; they do not reuse a licensed-site or JSM slot.
+Per-site Basic `email:token` in the OS keyring (file fallback for oversized credentials). Login stays in a terminal. Jira, Confluence, and JSM use `--site`. Bitbucket PRs use a **separate** workspace token; they do not reuse a licensed-site or JSM slot.
 
 ```sh
 atlas auth login --site ALIAS --email EMAIL --token TOKEN
@@ -62,6 +62,8 @@ atlas auth status
 ```
 
 `--site` and `--workspace` are mutually exclusive. `--from-op` is a human `login` flag only. Do not call `auth login` through MCP. Tokens never go in `config.toml`.
+
+On headless Linux without a D-Bus Secret Service, set `ATLAS_CREDENTIAL_STORE=file` for both login and later commands. This explicitly stores credentials as JSON in `$XDG_STATE_HOME/atlas/session.json`, or `~/.local/state/atlas/session.json` when `XDG_STATE_HOME` is unset. Atlas creates the directory with mode `0700` and the file with mode `0600`. The default is the OS keyring; switching from the keyring to file mode requires signing in again. Set `ATLAS_CREDENTIAL_STORE=keyring` to select the default explicitly.
 
 ### Bitbucket API token
 

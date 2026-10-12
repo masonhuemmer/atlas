@@ -24,6 +24,9 @@ Secrets never appear in stdout, MCP text, or logs.
 
 const authHelp = `atlas auth — site and Bitbucket workspace Basic email:token (keyring service atlas-cli)
 
+Set ATLAS_CREDENTIAL_STORE=file for headless Linux without Secret Service.
+The file is $XDG_STATE_HOME/atlas/session.json or ~/.local/state/atlas/session.json.
+
 Verbs: status, login, logout
 status: signed_in, session_usable, sites[], and workspaces[]. No emails or tokens.
 login:  --site ALIAS --email EMAIL --token TOKEN
