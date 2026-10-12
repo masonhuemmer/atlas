@@ -59,6 +59,22 @@ jobs:
           $help = & $shim --help
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if (($help -join "`n") -notmatch 'Atlassian CLI') { throw 'Chocolatey shim did not run Atlas' }
+          Remove-Item Env:ATLAS_FAKE
+          Remove-Item Env:ATLAS_CREDENTIAL_STORE -ErrorAction SilentlyContinue
+          $config = Join-Path $env:RUNNER_TEMP 'atlas-compat.toml'
+          @'
+          [[sites]]
+          alias = "compat"
+          hostname = "example.atlassian.net"
+          role = "licensed"
+          '@ | Set-Content $config
+          $env:ATLAS_CONFIG = $config
+          $login = & $shim auth login --site compat --email compat@example.org --token dummy-compat-token | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0 -or -not $login.signed_in) { throw 'Windows keyring login failed' }
+          $status = & $shim auth status | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0 -or -not $status.session_usable) { throw 'Windows keyring status failed' }
+          $logout = & $shim auth logout | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0 -or $logout.signed_in) { throw 'Windows keyring logout failed' }
           choco uninstall atlas-atlassian --yes --no-progress
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if (Test-Path $shim) { throw 'Chocolatey did not remove atlas.exe shim' }

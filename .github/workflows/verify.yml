@@ -21,3 +21,30 @@ jobs:
         with:
           name: atlas-darwin-${{ runner.arch }}
           path: atlas
+
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Verify
+        run: make verify
+      - name: Build and test headless login
+        run: |
+          go build -o atlas ./cmd/atlas
+          cat > "$RUNNER_TEMP/atlas-config.toml" <<'EOF'
+          [[sites]]
+          alias = "compat"
+          hostname = "example.atlassian.net"
+          role = "licensed"
+          EOF
+          export ATLAS_CONFIG="$RUNNER_TEMP/atlas-config.toml"
+          export XDG_STATE_HOME="$RUNNER_TEMP/atlas-state"
+          export ATLAS_CREDENTIAL_STORE=file
+          ./atlas auth login --site compat --email compat@example.org --token dummy-compat-token | jq -e '.signed_in and .session_usable'
+          test "$(stat -c %a "$XDG_STATE_HOME/atlas/session.json")" = 600
+          ./atlas auth status | jq -e '.signed_in and .session_usable'
+          ./atlas auth logout | jq -e '.signed_in == false'
+          test ! -e "$XDG_STATE_HOME/atlas/session.json"

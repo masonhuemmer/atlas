@@ -28,9 +28,16 @@ func main() {
 		d.Store = &keychain.FileStore{Path: keychain.FakeSessionPath()}
 		d.Login = auth.FakeLogin()
 	} else {
-		d.Store = &keychain.Fallback{
-			Primary:   keychain.Keyring{},
-			Secondary: &keychain.FileStore{Path: keychain.LiveSessionPath()},
+		switch os.Getenv("ATLAS_CREDENTIAL_STORE") {
+		case "", "keyring":
+			d.Store = &keychain.Fallback{
+				Primary:   keychain.Keyring{},
+				Secondary: &keychain.FileStore{Path: keychain.LiveSessionPath()},
+			}
+		case "file":
+			d.Store = &keychain.FileStore{Path: keychain.LiveSessionPath()}
+		default:
+			os.Exit(cli.Fail(cli.Deps{}, domain.Usage("ATLAS_CREDENTIAL_STORE must be keyring or file")))
 		}
 		d.Login = storeLogin
 		live := &rest.Client{Store: d.Store}
