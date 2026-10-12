@@ -82,7 +82,7 @@ Write:
 - `write:pullrequest:bitbucket`
 - `write:issue:bitbucket`
 
-`pr get`, `list`, and `diff` need the read pullrequest and repository scopes. `pr create`, `edit`, `comment`, and `merge` also need `write:pullrequest:bitbucket`. Missing workspace cred is auth (exit 4); hint is `atlas auth login --workspace WORKSPACE`. There is no fallback to a Jira site token.
+`pr get`, `list`, and `diff` need the read pullrequest and repository scopes. `pr create`, `edit`, `comment`, `approve`, and `merge` also need `write:pullrequest:bitbucket`. Missing workspace cred is auth (exit 4); hint is `atlas auth login --workspace WORKSPACE`. There is no fallback to a Jira site token.
 
 ## Usage
 
@@ -96,7 +96,7 @@ atlas <namespace> <verb> [flags]
 | `site` | `list`, `resolve` |
 | `jira` | `get`, `search`, `suggest`, `users`, `boards`, `board placement`, `transitions`, `create`, `edit`, `comment`, `transition`, `link` |
 | `confluence` | `get`, `search`, `create`, `update`, `move` |
-| `pr` | `get`, `list`, `create`, `comment`, `merge`, `diff` |
+| `pr` | `get`, `list`, `create`, `edit`, `comment`, `approve`, `merge`, `diff` |
 | `jsm` | `desks`, `types`, `list`, `get`, `create`, `comment`, `transition` |
 | `mcp` | `serve` |
 

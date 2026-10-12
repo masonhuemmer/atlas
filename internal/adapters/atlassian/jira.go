@@ -24,6 +24,7 @@ type Memory struct {
 	spaces         map[string]string
 	nextPage       int
 	prs            map[string]domain.PullRequest
+	prApprovals    map[string]bool
 	prDiffs        map[string]string
 	nextPR         map[string]int
 	desks          []domain.ServiceDesk

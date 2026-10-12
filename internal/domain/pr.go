@@ -38,6 +38,15 @@ type PullRequestDiff struct {
 	Diff      string `json:"diff"`
 }
 
+// PullRequestApproval records the authenticated user's approval of a PR.
+type PullRequestApproval struct {
+	ID        int    `json:"id"`
+	Workspace string `json:"workspace"`
+	Repo      string `json:"repo"`
+	URL       string `json:"url"`
+	Approved  bool   `json:"approved"`
+}
+
 // CreatePullRequest is the REST field set we own for atlas pr create.
 // Minimum is title + source branch. Target defaults to DefaultTargetBranch.
 type CreatePullRequest struct {

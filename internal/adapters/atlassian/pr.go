@@ -48,6 +48,13 @@ func (p PRAPI) Comment(ctx context.Context, workspace, repo string, id int, body
 	return p.Memory.CommentPR(ctx, workspace, repo, id, body, dryRun)
 }
 
+func (p PRAPI) Approve(ctx context.Context, workspace, repo string, id int, dryRun bool) (domain.PullRequestApproval, error) {
+	if p.Memory == nil {
+		return domain.PullRequestApproval{}, domain.Service("pr memory not configured")
+	}
+	return p.Memory.ApprovePR(ctx, workspace, repo, id, dryRun)
+}
+
 func (p PRAPI) Merge(ctx context.Context, workspace, repo string, id int, dryRun bool) (domain.PullRequest, error) {
 	if p.Memory == nil {
 		return domain.PullRequest{}, domain.Service("pr memory not configured")
@@ -204,6 +211,32 @@ func (m *Memory) CommentPR(_ context.Context, workspace, repo string, id int, bo
 	pr.Comments = append(append([]string(nil), pr.Comments...), body)
 	m.putPRLocked(pr)
 	return nil
+}
+
+func (m *Memory) ApprovePR(_ context.Context, workspace, repo string, id int, dryRun bool) (domain.PullRequestApproval, error) {
+	if m == nil {
+		return domain.PullRequestApproval{}, domain.Service("pr memory not configured")
+	}
+	workspace, repo, err := normalizePR(workspace, repo)
+	if err != nil {
+		return domain.PullRequestApproval{}, err
+	}
+	if id <= 0 {
+		return domain.PullRequestApproval{}, domain.Usage("pr id is required").WithHint("atlas pr approve --repo atlas --id 1")
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	key := prKey(workspace, repo, id)
+	if _, ok := m.prs[key]; !ok {
+		return domain.PullRequestApproval{}, domain.NotFound("pull request not found").WithHint("check --repo and --id")
+	}
+	if !dryRun {
+		m.prApprovals[key] = true
+	}
+	return domain.PullRequestApproval{
+		ID: id, Workspace: workspace, Repo: repo, URL: domain.PRURL(workspace, repo, id),
+		Approved: m.prApprovals[key],
+	}, nil
 }
 
 func (m *Memory) MergePR(_ context.Context, workspace, repo string, id int, dryRun bool) (domain.PullRequest, error) {

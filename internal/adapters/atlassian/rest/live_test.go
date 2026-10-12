@@ -523,6 +523,13 @@ func TestBitbucketOperationsUseSelectedWorkspaceCred(t *testing.T) {
 		{name: "comment", call: func(b Bitbucket) error {
 			return b.Comment(context.Background(), "workspace-b", "atlas", 1, "body", false)
 		}},
+		{name: "approve", call: func(b Bitbucket) error {
+			approval, err := b.Approve(context.Background(), "workspace-b", "atlas", 1, false)
+			if err == nil && (!approval.Approved || approval.ID != 1) {
+				t.Fatalf("unexpected approval: %+v", approval)
+			}
+			return err
+		}},
 		{name: "merge", call: func(b Bitbucket) error {
 			_, err := b.Merge(context.Background(), "workspace-b", "atlas", 1, false)
 			return err
@@ -541,12 +548,17 @@ func TestBitbucketOperationsUseSelectedWorkspaceCred(t *testing.T) {
 				if !strings.Contains(r.URL.Path, "/repositories/workspace-b/atlas/pullrequests") {
 					t.Fatal(r.URL.Path)
 				}
+				if tt.name == "approve" && (r.Method != http.MethodPost || r.URL.Path != "/2.0/repositories/workspace-b/atlas/pullrequests/1/approve") {
+					t.Fatalf("approve request: %s %s", r.Method, r.URL.Path)
+				}
 				switch tt.name {
 				case "list":
 					_ = json.NewEncoder(w).Encode(map[string]any{"values": []any{}})
 				case "comment":
 					w.WriteHeader(http.StatusCreated)
 					_, _ = w.Write([]byte(`{}`))
+				case "approve":
+					_, _ = w.Write([]byte(`{"approved":true}`))
 				case "create":
 					w.WriteHeader(http.StatusCreated)
 					_ = json.NewEncoder(w).Encode(map[string]any{"id": 2, "title": "pr", "state": "OPEN"})

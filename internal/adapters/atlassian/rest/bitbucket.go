@@ -153,6 +153,30 @@ func (b Bitbucket) Comment(ctx context.Context, workspace, repo string, id int, 
 	return nil
 }
 
+func (b Bitbucket) Approve(ctx context.Context, workspace, repo string, id int, dryRun bool) (domain.PullRequestApproval, error) {
+	approval := domain.PullRequestApproval{ID: id, Workspace: workspace, Repo: repo, URL: domain.PRURL(workspace, repo, id)}
+	if dryRun {
+		return approval, nil
+	}
+	cred, err := b.workspaceCred(workspace)
+	if err != nil {
+		return domain.PullRequestApproval{}, err
+	}
+	u := joinURL(b.bitbucketOrigin(), "/2.0/repositories/"+q(workspace)+"/"+q(repo)+"/pullrequests/"+strconv.Itoa(id)+"/approve")
+	code, body, err := b.doJSON(ctx, http.MethodPost, u, cred, nil, nil)
+	if err != nil {
+		return domain.PullRequestApproval{}, err
+	}
+	if code != http.StatusOK {
+		return domain.PullRequestApproval{}, MapBitbucketStatus(code)
+	}
+	if approved, _ := mustJSON(body)["approved"].(bool); !approved {
+		return domain.PullRequestApproval{}, domain.Service("Bitbucket did not confirm pull request approval")
+	}
+	approval.Approved = true
+	return approval, nil
+}
+
 func (b Bitbucket) Merge(ctx context.Context, workspace, repo string, id int, dryRun bool) (domain.PullRequest, error) {
 	if dryRun {
 		return b.Get(ctx, workspace, repo, id)
