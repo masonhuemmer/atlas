@@ -10,6 +10,7 @@ import (
 // Workspace default comes from catalog defaults.workspace. SSH and git stay out.
 type Store interface {
 	Get(ctx context.Context, workspace, repo string, id int) (domain.PullRequest, error)
+	Comments(ctx context.Context, workspace, repo string, id, page, limit int) (domain.PullRequestCommentPage, error)
 	List(ctx context.Context, workspace, repo string) (domain.PullRequestList, error)
 	Create(ctx context.Context, workspace, repo string, in domain.CreatePullRequest, dryRun bool) (domain.PullRequest, error)
 	Edit(ctx context.Context, workspace, repo string, id int, in domain.EditPullRequest, dryRun bool) (domain.PullRequest, error)

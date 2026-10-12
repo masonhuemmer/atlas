@@ -68,7 +68,7 @@ keys map to an alias. JQL/CQL that names two sites is usage. A
 | Confluence get/search | `atlas_read` `confluence` `get` / `search` (`cql`); body is storage markup |
 | Confluence create/update | `atlas_write`; create under a page with `flags={space:"KEY",parent:"PAGE_ID",title:"…",body:"…"}`. Markdown is converted to storage markup; set `body-format:"storage"` for prepared Confluence XHTML |
 | Move a Confluence page | `atlas_write` `namespace=confluence` `verb=move` `args=["PAGE_ID"]` `flags={parent:"NEW_PARENT_ID",site:"ALIAS"}` + `write_opt_in`; source and parent must be in the same space. No delete |
-| PR get/list/diff | `atlas_read` `pr` `get` / `list` / `diff` (`repo`, `id`) |
+| PR get/list/comments/diff | `atlas_read` `pr` `get` / `list` / `comments` / `diff` (`repo`, `id`); `get` includes author and approval participants |
 | PR create/edit/comment/approve/merge | `atlas_write`; edit an open PR's title or description with `namespace=pr` `verb=edit` `flags={repo:"SLUG",id:1,description:"…"}` + `write_opt_in`; approve with `namespace=pr` `verb=approve` `flags={repo:"SLUG",id:1}` + `write_opt_in`; no delete |
 | JSM desks/types/list/get | `atlas_read` `jsm` `desks` / `types` / `list` / `get` |
 | JSM create/comment/transition | `atlas_write`; comments are public |
@@ -84,6 +84,8 @@ keys map to an alias. JQL/CQL that names two sites is usage. A
 ## Jira descriptions
 
 When creating an issue, pass Markdown in the `description` flag. When editing one, pass a Markdown string as `description` inside the `fields` JSON object. Atlas converts those strings to Jira rich text on write. Read the issue with `jira get` afterward to check the stored description.
+
+After `jira comment`, read the issue with `jira get KEY-1 --fields comment` and check `comments` for the exact text. After `pr comment`, read `pr comments --repo SLUG --id N` and follow `next_page` if needed. After `pr approve`, read `pr get --repo SLUG --id N` and check the approving participant against the author.
 
 ## Board placement
 

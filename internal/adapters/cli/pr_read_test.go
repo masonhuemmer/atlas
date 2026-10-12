@@ -36,6 +36,26 @@ func TestPRGetSeed(t *testing.T) {
 	}
 }
 
+func TestPRCommentsReadBack(t *testing.T) {
+	d, out, errw := testDeps()
+	if code := Run([]string{"atlas", "pr", "comment", "--repo", "atlas", "--id", "1", "--body", "benchmark verification"}, d); code != domain.ExitOK {
+		t.Fatal(code, errw.String())
+	}
+	out.Reset()
+	errw.Reset()
+	if code := Run([]string{"atlas", "pr", "comments", "--repo", "atlas", "--id", "1"}, d); code != domain.ExitOK {
+		t.Fatal(code, errw.String())
+	}
+	var got struct {
+		Comments []struct {
+			Body string `json:"body"`
+		} `json:"comments"`
+	}
+	if err := json.Unmarshal(out.Bytes(), &got); err != nil || len(got.Comments) != 1 || got.Comments[0].Body != "benchmark verification" {
+		t.Fatalf("output=%s err=%v", out.String(), err)
+	}
+}
+
 func TestPRListSeed(t *testing.T) {
 	d, out, errw := testDeps()
 	code := Run([]string{"atlas", "pr", "list", "--repo", "atlas"}, d)

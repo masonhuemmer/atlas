@@ -192,6 +192,14 @@ func TestPRApproveDryRunAndWrite(t *testing.T) {
 	if err != nil || !got.Approved {
 		t.Fatalf("approval not persisted: %+v %v", got, err)
 	}
+	out.Reset()
+	if code = Run([]string{"atlas", "pr", "get", "--repo", "atlas", "--id", "1"}, d); code != domain.ExitOK {
+		t.Fatal(code, errw.String())
+	}
+	var pr domain.PullRequest
+	if err := json.Unmarshal(out.Bytes(), &pr); err != nil || len(pr.Participants) != 1 || !pr.Participants[0].Approved {
+		t.Fatalf("readback=%s err=%v", out.String(), err)
+	}
 }
 
 func TestMCPPRApproveWriteGate(t *testing.T) {

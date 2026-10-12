@@ -51,8 +51,13 @@ func jiraGet(args []string, d Deps, format string) int {
 	fsset := flag.NewFlagSet("jira get", flag.ContinueOnError)
 	fsset.SetOutput(d.Stderr)
 	siteFlag := fsset.String("site", "", "site alias, hostname, or UUID")
+	fieldsFlag := fsset.String("fields", "", "comma-separated output fields (comment selects comments)")
 	if err := parseMixed(fsset, args); err != nil {
 		return fail(d, domain.Usage(err.Error()))
+	}
+	fields, err := jiraGetFields(*fieldsFlag)
+	if err != nil {
+		return fail(d, err)
 	}
 	key := fsset.Arg(0)
 	if strings.TrimSpace(key) == "" {
@@ -72,7 +77,45 @@ func jiraGet(args []string, d Deps, format string) int {
 	if err != nil {
 		return fail(d, err)
 	}
+	if len(fields) > 0 {
+		fullJSON, _ := json.Marshal(iss)
+		var full map[string]any
+		_ = json.Unmarshal(fullJSON, &full)
+		selected := map[string]any{"key": iss.Key, "site": iss.Site, "browse_url": iss.BrowseURL}
+		for _, field := range fields {
+			if value, ok := full[field]; ok {
+				selected[field] = value
+			} else if field == "comments" {
+				selected[field] = []string{}
+			}
+		}
+		return success(d, format, selected)
+	}
 	return success(d, format, iss)
+}
+
+func jiraGetFields(raw string) ([]string, error) {
+	if strings.TrimSpace(raw) == "" {
+		return nil, nil
+	}
+	allowed := map[string]bool{
+		"summary": true, "description": true, "status": true, "status_id": true,
+		"issuetype": true, "parent": true, "priority": true, "labels": true,
+		"assignee": true, "reporter": true, "created": true, "updated": true,
+		"project": true, "comments": true, "links": true,
+	}
+	var fields []string
+	for _, rawField := range strings.Split(raw, ",") {
+		field := strings.ToLower(strings.TrimSpace(rawField))
+		if field == "comment" {
+			field = "comments"
+		}
+		if !allowed[field] {
+			return nil, domain.Usagef("unknown jira get field %q", rawField)
+		}
+		fields = append(fields, field)
+	}
+	return fields, nil
 }
 
 func jiraSearch(args []string, d Deps, format string) int {
