@@ -1,8 +1,8 @@
 class Atlas < Formula
   desc "Atlassian CLI for Jira, Confluence, Bitbucket, and JSM customer REST"
   homepage "https://github.com/masonhuemmer/atlas"
-  url "https://github.com/masonhuemmer/atlas/archive/refs/tags/v1.4.0.tar.gz"
-  sha256 "bc7a4dc849dc7b2b462ff6e2cd0bef4edbf1f55d26133bbbd13dd8f8712bc084"
+  url "https://github.com/masonhuemmer/atlas/archive/refs/tags/v1.5.0.tar.gz"
+  sha256 "deb9985e0ded7d96329777a78bdb096aa030e6167928970e5ebd7318f52c2842"
   license "MIT"
   head "https://github.com/masonhuemmer/atlas.git", branch: "main"
 
