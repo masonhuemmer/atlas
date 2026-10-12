@@ -93,6 +93,25 @@ func TestJiraCommentPersists(t *testing.T) {
 	}
 }
 
+func TestJiraCommentReadBackWithFields(t *testing.T) {
+	d, out, errw := testDeps()
+	if code := Run([]string{"atlas", "jira", "comment", "SDO-1", "--body", "benchmark verification"}, d); code != domain.ExitOK {
+		t.Fatal(code, errw.String())
+	}
+	out.Reset()
+	errw.Reset()
+	if code := Run([]string{"atlas", "jira", "get", "SDO-1", "--fields", "comment"}, d); code != domain.ExitOK {
+		t.Fatal(code, errw.String())
+	}
+	var got struct {
+		Key      string   `json:"key"`
+		Comments []string `json:"comments"`
+	}
+	if err := json.Unmarshal(out.Bytes(), &got); err != nil || got.Key != "SDO-1" || len(got.Comments) != 1 || got.Comments[0] != "benchmark verification" {
+		t.Fatalf("output=%s err=%v", out.String(), err)
+	}
+}
+
 func TestJiraInternalCommentDryRun(t *testing.T) {
 	d, out, errw := testDeps()
 	code := Run([]string{"atlas", "jira", "comment", "SDO-1", "--body", "private update", "--internal", "--dry-run"}, d)

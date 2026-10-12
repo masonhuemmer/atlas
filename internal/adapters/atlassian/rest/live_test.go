@@ -623,6 +623,48 @@ func TestBitbucketEditUpdatesDescriptionWithoutReplacingTitle(t *testing.T) {
 	}
 }
 
+func TestBitbucketGetExposesAuthorAndApprovalParticipants(t *testing.T) {
+	c, _ := liveClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet || r.URL.Path != "/2.0/repositories/ws/atlas/pullrequests/1" {
+			t.Fatalf("request %s %s", r.Method, r.URL.String())
+		}
+		_, _ = w.Write([]byte(`{"id":1,"state":"OPEN","author":{"uuid":"{author-uuid}","display_name":"Author"},"participants":[{"user":{"uuid":"{approver-uuid}","display_name":"Approver"},"approved":true,"role":"REVIEWER"}]}`))
+	}))
+	if err := auth.PutWorkspace(c.Store, "ws", auth.Cred{Email: "ws@example.com", Token: "ws-token"}); err != nil {
+		t.Fatal(err)
+	}
+	pr, err := (Bitbucket{Client: c}).Get(context.Background(), "ws", "atlas", 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got map[string]any
+	b, _ := json.Marshal(pr)
+	_ = json.Unmarshal(b, &got)
+	if author := asMap(got["author"]); author["uuid"] != "{author-uuid}" {
+		t.Fatalf("author missing: %s", b)
+	}
+	participants := asList(got["participants"])
+	if len(participants) != 1 || asMap(participants[0])["approved"] != true || asMap(asMap(participants[0])["user"])["uuid"] != "{approver-uuid}" {
+		t.Fatalf("approval participant missing: %s", b)
+	}
+}
+
+func TestBitbucketCommentsReturnsPageAndNextPage(t *testing.T) {
+	c, _ := liveClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet || r.URL.Path != "/2.0/repositories/ws/atlas/pullrequests/1/comments" || r.URL.Query().Get("page") != "2" || r.URL.Query().Get("pagelen") != "50" {
+			t.Fatalf("request %s %s", r.Method, r.URL.String())
+		}
+		_, _ = w.Write([]byte(`{"values":[{"id":42,"content":{"raw":"benchmark verification"},"user":{"uuid":"{author-uuid}","display_name":"Author"}}],"next":"https://api.bitbucket.org/2.0/repositories/ws/atlas/pullrequests/1/comments?page=3"}`))
+	}))
+	if err := auth.PutWorkspace(c.Store, "ws", auth.Cred{Email: "ws@example.com", Token: "ws-token"}); err != nil {
+		t.Fatal(err)
+	}
+	page, err := (Bitbucket{Client: c}).Comments(context.Background(), "ws", "atlas", 1, 2, 50)
+	if err != nil || page.NextPage != 3 || len(page.Comments) != 1 || page.Comments[0].ID != 42 || page.Comments[0].Body != "benchmark verification" || page.Comments[0].Author == nil || page.Comments[0].Author.UUID != "{author-uuid}" {
+		t.Fatalf("page=%+v err=%v", page, err)
+	}
+}
+
 func TestBitbucketDoesNotFallBackToLicensedSiteCred(t *testing.T) {
 	hit := false
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

@@ -26,6 +26,13 @@ func TestJiraUsersIsReadOnly(t *testing.T) {
 	}
 }
 
+func TestPRCommentsIsReadOnly(t *testing.T) {
+	args, err := buildReadArgs("pr", "comments", nil, map[string]any{"repo": "atlas", "id": float64(1)})
+	if err != nil || len(args) != 5 || isWrite("pr", "comments") {
+		t.Fatalf("args=%v err=%v", args, err)
+	}
+}
+
 func TestWriteGateInjectsDryRun(t *testing.T) {
 	writes := [][2]string{
 		{"jira", "create"},

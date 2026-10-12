@@ -31,6 +31,37 @@ func (b Bitbucket) Get(ctx context.Context, workspace, repo string, id int) (dom
 	return prFromREST(workspace, repo, mustJSON(body)), nil
 }
 
+func (b Bitbucket) Comments(ctx context.Context, workspace, repo string, id, page, limit int) (domain.PullRequestCommentPage, error) {
+	cred, err := b.workspaceCred(workspace)
+	if err != nil {
+		return domain.PullRequestCommentPage{}, err
+	}
+	u := joinURL(b.bitbucketOrigin(), "/2.0/repositories/"+q(workspace)+"/"+q(repo)+"/pullrequests/"+strconv.Itoa(id)+"/comments?page="+strconv.Itoa(page)+"&pagelen="+strconv.Itoa(limit))
+	code, body, err := b.doJSON(ctx, http.MethodGet, u, cred, nil, nil)
+	if err != nil {
+		return domain.PullRequestCommentPage{}, err
+	}
+	if code != http.StatusOK {
+		return domain.PullRequestCommentPage{}, MapBitbucketStatus(code)
+	}
+	m := mustJSON(body)
+	result := domain.PullRequestCommentPage{ID: id, Workspace: workspace, Repo: repo, Comments: []domain.PullRequestComment{}}
+	for _, raw := range asList(m["values"]) {
+		comment := asMap(raw)
+		commentID := 0
+		if n, ok := comment["id"].(float64); ok {
+			commentID = int(n)
+		}
+		result.Comments = append(result.Comments, domain.PullRequestComment{
+			ID: commentID, Body: str(asMap(comment["content"]), "raw"), Author: prUserFromREST(asMap(comment["user"])),
+		})
+	}
+	if str(m, "next") != "" {
+		result.NextPage = page + 1
+	}
+	return result, nil
+}
+
 func (b Bitbucket) List(ctx context.Context, workspace, repo string) (domain.PullRequestList, error) {
 	cred, err := b.workspaceCred(workspace)
 	if err != nil {
@@ -222,13 +253,33 @@ func prFromREST(workspace, repo string, m map[string]any) domain.PullRequest {
 	state := strings.ToUpper(str(m, "state"))
 	var reviewers []string
 	for _, raw := range asList(m["reviewers"]) {
-		reviewers = append(reviewers, displayUser(asMap(raw)))
+		if user := prUserFromREST(asMap(raw)); user != nil {
+			reviewers = append(reviewers, user.DisplayName)
+		}
+	}
+	var participants []domain.PRParticipant
+	for _, raw := range asList(m["participants"]) {
+		participant := asMap(raw)
+		user := prUserFromREST(asMap(participant["user"]))
+		if user == nil {
+			continue
+		}
+		approved, _ := participant["approved"].(bool)
+		participants = append(participants, domain.PRParticipant{User: *user, Approved: approved, Role: str(participant, "role")})
 	}
 	return domain.PullRequest{
 		ID: id, Workspace: workspace, Repo: repo, Title: str(m, "title"),
 		Description: str(m, "description"), Source: src, Target: dst, State: state,
 		URL: domain.PRURL(workspace, repo, id), Reviewers: reviewers,
+		Author: prUserFromREST(asMap(m["author"])), Participants: participants,
 	}
+}
+
+func prUserFromREST(m map[string]any) *domain.PRUser {
+	if m == nil {
+		return nil
+	}
+	return &domain.PRUser{UUID: str(m, "uuid"), AccountID: str(m, "account_id"), DisplayName: str(m, "display_name")}
 }
 
 func MapBitbucketStatus(code int) error {

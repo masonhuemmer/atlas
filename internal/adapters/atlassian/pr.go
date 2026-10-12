@@ -20,6 +20,13 @@ func (p PRAPI) Get(ctx context.Context, workspace, repo string, id int) (domain.
 	return p.Memory.GetPR(ctx, workspace, repo, id)
 }
 
+func (p PRAPI) Comments(ctx context.Context, workspace, repo string, id, page, limit int) (domain.PullRequestCommentPage, error) {
+	if p.Memory == nil {
+		return domain.PullRequestCommentPage{}, domain.Service("pr memory not configured")
+	}
+	return p.Memory.CommentsPR(ctx, workspace, repo, id, page, limit)
+}
+
 func (p PRAPI) List(ctx context.Context, workspace, repo string) (domain.PullRequestList, error) {
 	if p.Memory == nil {
 		return domain.PullRequestList{}, domain.Service("pr memory not configured")
@@ -87,6 +94,29 @@ func (m *Memory) GetPR(_ context.Context, workspace, repo string, id int) (domai
 		return domain.PullRequest{}, domain.NotFound("pull request not found").WithHint("check --repo and --id")
 	}
 	return clonePR(pr), nil
+}
+
+func (m *Memory) CommentsPR(ctx context.Context, workspace, repo string, id, page, limit int) (domain.PullRequestCommentPage, error) {
+	pr, err := m.GetPR(ctx, workspace, repo, id)
+	if err != nil {
+		return domain.PullRequestCommentPage{}, err
+	}
+	result := domain.PullRequestCommentPage{ID: id, Workspace: pr.Workspace, Repo: pr.Repo, Comments: []domain.PullRequestComment{}}
+	start := (page - 1) * limit
+	if start >= len(pr.Comments) {
+		return result, nil
+	}
+	end := start + limit
+	if end > len(pr.Comments) {
+		end = len(pr.Comments)
+	}
+	for i := start; i < end; i++ {
+		result.Comments = append(result.Comments, domain.PullRequestComment{ID: i + 1, Body: pr.Comments[i]})
+	}
+	if end < len(pr.Comments) {
+		result.NextPage = page + 1
+	}
+	return result, nil
 }
 
 func (m *Memory) ListPRs(_ context.Context, workspace, repo string) (domain.PullRequestList, error) {
@@ -227,10 +257,15 @@ func (m *Memory) ApprovePR(_ context.Context, workspace, repo string, id int, dr
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	key := prKey(workspace, repo, id)
-	if _, ok := m.prs[key]; !ok {
+	pr, ok := m.prs[key]
+	if !ok {
 		return domain.PullRequestApproval{}, domain.NotFound("pull request not found").WithHint("check --repo and --id")
 	}
 	if !dryRun {
+		if !m.prApprovals[key] {
+			pr.Participants = append(pr.Participants, domain.PRParticipant{User: domain.PRUser{UUID: "{atlas-fake-user}", DisplayName: "Atlas fake user"}, Approved: true, Role: "REVIEWER"})
+			m.putPRLocked(pr)
+		}
 		m.prApprovals[key] = true
 	}
 	return domain.PullRequestApproval{
@@ -317,6 +352,13 @@ func clonePR(pr domain.PullRequest) domain.PullRequest {
 	}
 	if pr.Reviewers != nil {
 		out.Reviewers = append([]string(nil), pr.Reviewers...)
+	}
+	if pr.Author != nil {
+		author := *pr.Author
+		out.Author = &author
+	}
+	if pr.Participants != nil {
+		out.Participants = append([]domain.PRParticipant(nil), pr.Participants...)
 	}
 	return out
 }

@@ -104,7 +104,7 @@ func isRead(ns, verb string) bool {
 	case "auth status", "site list", "site resolve",
 		"jira get", "jira search", "jira suggest", "jira users", "jira boards", "jira board", "jira transitions",
 		"confluence get", "confluence search",
-		"pr get", "pr list", "pr diff",
+		"pr get", "pr list", "pr comments", "pr diff",
 		"jsm desks", "jsm types", "jsm list", "jsm get":
 		return true
 	}

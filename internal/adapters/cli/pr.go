@@ -17,6 +17,8 @@ func runPR(args []string, d Deps, format string) int {
 		return prGet(args, d, format)
 	case "list":
 		return prList(args, d, format)
+	case "comments":
+		return prComments(args, d, format)
 	case "create":
 		return prCreate(args, d, format)
 	case "edit":
@@ -30,7 +32,7 @@ func runPR(args []string, d Deps, format string) int {
 	case "diff":
 		return prDiff(args, d, format)
 	default:
-		return fail(d, domain.Usagef("unknown pr verb %q", verb).WithHint("atlas pr get|list|create|edit|comment|approve|merge|diff"))
+		return fail(d, domain.Usagef("unknown pr verb %q", verb).WithHint("atlas pr get|list|comments|create|edit|comment|approve|merge|diff"))
 	}
 }
 
@@ -81,6 +83,35 @@ func prList(args []string, d Deps, format string) int {
 		return fail(d, err)
 	}
 	return success(d, format, page)
+}
+
+func prComments(args []string, d Deps, format string) int {
+	if hasHelp(args) {
+		return writeHelp(d.Stdout, prHelp)
+	}
+	fsset := flag.NewFlagSet("pr comments", flag.ContinueOnError)
+	fsset.SetOutput(d.Stderr)
+	workspace, repo, id := prCommonFlags(fsset)
+	page := fsset.Int("page", 1, "page number")
+	limit := fsset.Int("limit", 50, "comments per page (1..100)")
+	if err := parseMixed(fsset, args); err != nil {
+		return fail(d, domain.Usage(err.Error()))
+	}
+	ws, r, n, err := requirePR(*workspace, *repo, *id)
+	if err != nil {
+		return fail(d, err)
+	}
+	if *page < 1 || *limit < 1 || *limit > 100 {
+		return fail(d, domain.Usage("comments requires --page >= 1 and --limit 1..100"))
+	}
+	if d.PR == nil {
+		return fail(d, domain.Service("pr adapter not configured"))
+	}
+	comments, err := d.PR.Comments(ctx(), ws, r, n, *page, *limit)
+	if err != nil {
+		return fail(d, err)
+	}
+	return success(d, format, comments)
 }
 
 func prCreate(args []string, d Deps, format string) int {

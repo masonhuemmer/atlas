@@ -9,7 +9,7 @@ Namespaces:
   site         list and resolve clouds from config
   jira         get, search, suggest, users, boards, board, transitions, create, edit, comment, transition, link
   confluence   get, search, create, update (no delete)
-  pr           get, list, create, edit, comment, approve, merge, diff (no delete)
+  pr           get, list, comments, create, edit, comment, approve, merge, diff (no delete)
   jsm          customer REST: desks, types, list, get, create, comment, transition
   mcp          stdio MCP for agents (serve)
 
@@ -47,7 +47,9 @@ Output: JSON (default) or --human.
 const jiraHelp = `atlas jira — licensed Jira on one cloud
 
 Verbs: get, search, suggest, users, boards, board, transitions, create, edit, comment, transition, link
-get:        atlas jira get KEY-1
+get:        atlas jira get KEY-1 [--fields comment,summary]
+            get includes comments; use it after jira comment to verify the text persisted.
+            --fields selects output fields; comment selects comments.
 search:     atlas jira search --jql 'project = KEY' [--limit 50] [--page-token TOKEN]
 suggest:    atlas jira suggest --query 'text' [--project KEY] [--site ALIAS]
 users:      atlas jira users --query 'Alex' --project KEY
@@ -105,9 +107,10 @@ Output: JSON (default) or --human.
 
 const prHelp = `atlas pr — Bitbucket Cloud REST 2.0
 
-Verbs: get, list, create, edit, comment, approve, merge, diff
+Verbs: get, list, comments, create, edit, comment, approve, merge, diff
 get:     atlas pr get --repo SLUG --id 1
 list:    atlas pr list --repo SLUG
+comments: atlas pr comments --repo SLUG --id 1 [--page 1] [--limit 50]
 create:  atlas pr create --repo SLUG --title '...' --source <branch> [--target main]
 edit:    atlas pr edit --repo SLUG --id 1 --description '...' [--title '...']
 comment: atlas pr comment --repo SLUG --id 1 --body '...'
@@ -121,6 +124,7 @@ atlas auth login --workspace WORKSPACE --email EMAIL --token TOKEN.
 There is no fallback to a Jira or Confluence site credential.
 There is no delete verb. SSH and git stay out of pr.
 Reviewer updates are REST fields on create.
+get includes the author and approval participants. Read comments with pr comments.
 MCP writes dry-run unless write_opt_in is true.
 Live base: https://api.bitbucket.org/2.0/repositories/{workspace}/{repo}/pullrequests
 Output: JSON (default) or --human.
