@@ -9,7 +9,7 @@ Namespaces:
   site         list and resolve clouds from config
   jira         get, search, suggest, users, boards, board, transitions, create, edit, comment, transition, link
   confluence   get, search, create, update (no delete)
-  pr           get, list, create, edit, comment, merge, diff (no delete)
+  pr           get, list, create, edit, comment, approve, merge, diff (no delete)
   jsm          customer REST: desks, types, list, get, create, comment, transition
   mcp          stdio MCP for agents (serve)
 
@@ -105,16 +105,17 @@ Output: JSON (default) or --human.
 
 const prHelp = `atlas pr — Bitbucket Cloud REST 2.0
 
-Verbs: get, list, create, edit, comment, merge, diff
+Verbs: get, list, create, edit, comment, approve, merge, diff
 get:     atlas pr get --repo SLUG --id 1
 list:    atlas pr list --repo SLUG
 create:  atlas pr create --repo SLUG --title '...' --source <branch> [--target main]
 edit:    atlas pr edit --repo SLUG --id 1 --description '...' [--title '...']
 comment: atlas pr comment --repo SLUG --id 1 --body '...'
+approve: atlas pr approve --repo SLUG --id 1
 merge:   atlas pr merge --repo SLUG --id 1
 diff:    atlas pr diff --repo SLUG --id 1
 
---workspace is optional and defaults to config defaults.workspace. Edit and merge are writes.
+--workspace is optional and defaults to config defaults.workspace. Edit, approve, and merge are writes.
 PR operations require a separate credential stored by workspace:
 atlas auth login --workspace WORKSPACE --email EMAIL --token TOKEN.
 There is no fallback to a Jira or Confluence site credential.

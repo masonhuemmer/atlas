@@ -121,7 +121,7 @@ func TestMCPHelpNeverRunsVerb(t *testing.T) {
 		"site":       {"list", "resolve"},
 		"jira":       {"get", "search", "users", "create", "edit", "comment", "transition", "link"},
 		"confluence": {"get", "search", "create", "update", "move"},
-		"pr":         {"get", "list", "create", "edit", "comment", "merge", "diff"},
+		"pr":         {"get", "list", "create", "edit", "comment", "approve", "merge", "diff"},
 		"jsm":        {"desks", "types", "list", "get", "create", "comment", "transition"},
 	}
 	var pairs [][2]string

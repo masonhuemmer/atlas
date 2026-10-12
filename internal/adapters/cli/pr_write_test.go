@@ -163,6 +163,68 @@ func TestMCPPREditWriteGate(t *testing.T) {
 	}
 }
 
+func TestPRApproveDryRunAndWrite(t *testing.T) {
+	d, out, errw := testDeps()
+	mem := d.PR.(atlassian.PRAPI).Memory
+	args := []string{"atlas", "pr", "approve", "--repo", "atlas", "--id", "1"}
+	code := Run(append(append([]string(nil), args...), "--dry-run"), d)
+	if code != domain.ExitOK {
+		t.Fatal(code, errw.String())
+	}
+	var preview prDryRun
+	if err := json.Unmarshal(out.Bytes(), &preview); err != nil || !preview.DryRun || preview.Verb != "approve" {
+		t.Fatalf("preview=%+v err=%v", preview, err)
+	}
+	got, err := mem.ApprovePR(context.Background(), domain.DefaultWorkspace(), "atlas", 1, true)
+	if err != nil || got.Approved {
+		t.Fatalf("dry-run changed approval: %+v %v", got, err)
+	}
+	out.Reset()
+	errw.Reset()
+	if code = Run(args, d); code != domain.ExitOK {
+		t.Fatal(code, errw.String())
+	}
+	var approval domain.PullRequestApproval
+	if err := json.Unmarshal(out.Bytes(), &approval); err != nil || !approval.Approved || approval.ID != 1 {
+		t.Fatalf("approval=%+v err=%v", approval, err)
+	}
+	got, err = mem.ApprovePR(context.Background(), domain.DefaultWorkspace(), "atlas", 1, true)
+	if err != nil || !got.Approved {
+		t.Fatalf("approval not persisted: %+v %v", got, err)
+	}
+}
+
+func TestMCPPRApproveWriteGate(t *testing.T) {
+	d, _, _ := testDeps()
+	mem := d.PR.(atlassian.PRAPI).Memory
+	cs := connectMCP(t, d)
+	flags := map[string]any{"repo": "atlas", "id": float64(1)}
+	res, err := cs.CallTool(context.Background(), &mcp.CallToolParams{
+		Name: "atlas_write", Arguments: writeIn{Namespace: "pr", Verb: "approve", Flags: flags},
+	})
+	if err != nil || res.IsError {
+		t.Fatal(err, toolText(t, res))
+	}
+	var preview prDryRun
+	if err := json.Unmarshal([]byte(toolText(t, res)), &preview); err != nil || !preview.DryRun {
+		t.Fatal(err, toolText(t, res))
+	}
+	got, err := mem.ApprovePR(context.Background(), domain.DefaultWorkspace(), "atlas", 1, true)
+	if err != nil || got.Approved {
+		t.Fatalf("approval changed without opt-in: %+v %v", got, err)
+	}
+	res, err = cs.CallTool(context.Background(), &mcp.CallToolParams{
+		Name: "atlas_write", Arguments: writeIn{Namespace: "pr", Verb: "approve", Flags: flags, WriteOptIn: true},
+	})
+	if err != nil || res.IsError {
+		t.Fatal(err, toolText(t, res))
+	}
+	var approval domain.PullRequestApproval
+	if err := json.Unmarshal([]byte(toolText(t, res)), &approval); err != nil || !approval.Approved {
+		t.Fatal(err, toolText(t, res))
+	}
+}
+
 func TestMCPPRMergeWriteGate(t *testing.T) {
 	d, _, _ := testDeps()
 	mem := d.PR.(atlassian.PRAPI).Memory

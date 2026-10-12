@@ -99,6 +99,7 @@ func Seed() *Memory {
 		spaces:         map[string]string{},
 		nextPage:       101,
 		prs:            map[string]domain.PullRequest{},
+		prApprovals:    map[string]bool{},
 		prDiffs:        map[string]string{},
 		nextPR:         map[string]int{},
 		types:          map[string][]domain.RequestType{},

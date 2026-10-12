@@ -37,10 +37,11 @@ Bitbucket Cloud REST. Workspace from config defaults.workspace. Authentication u
   atlas pr get --repo SLUG --id 1
   atlas pr edit --repo SLUG --id 1 --description '…' --dry-run
   atlas pr comment --repo SLUG --id 1 --body '…' --dry-run
+  atlas pr approve --repo SLUG --id 1 --dry-run
   atlas pr merge --repo SLUG --id 1 --dry-run
   atlas_read namespace=pr verb=get flags repo=SLUG id=1
 
-Edit and merge are writes. Reviewer updates are REST fields.
+Edit, approve, and merge are writes. Approval acts as the workspace credential's user. Reviewer updates are REST fields.
 Missing workspace auth requires atlas auth login --workspace WORKSPACE in a terminal.
 `
 

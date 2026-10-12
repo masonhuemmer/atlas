@@ -23,12 +23,14 @@ func runPR(args []string, d Deps, format string) int {
 		return prEdit(args, d, format)
 	case "comment":
 		return prComment(args, d, format)
+	case "approve":
+		return prApprove(args, d, format)
 	case "merge":
 		return prMerge(args, d, format)
 	case "diff":
 		return prDiff(args, d, format)
 	default:
-		return fail(d, domain.Usagef("unknown pr verb %q", verb).WithHint("atlas pr get|list|create|edit|comment|merge|diff"))
+		return fail(d, domain.Usagef("unknown pr verb %q", verb).WithHint("atlas pr get|list|create|edit|comment|approve|merge|diff"))
 	}
 }
 
@@ -226,6 +228,36 @@ func prComment(args []string, d Deps, format string) int {
 		})
 	}
 	return success(d, format, map[string]any{"id": n, "repo": r, "workspace": ws, "body": *body})
+}
+
+func prApprove(args []string, d Deps, format string) int {
+	if hasHelp(args) {
+		return writeHelp(d.Stdout, prHelp)
+	}
+	fsset := flag.NewFlagSet("pr approve", flag.ContinueOnError)
+	fsset.SetOutput(d.Stderr)
+	workspace, repo, id := prCommonFlags(fsset)
+	dry := fsset.Bool("dry-run", false, "")
+	if err := parseMixed(fsset, args); err != nil {
+		return fail(d, domain.Usage(err.Error()))
+	}
+	ws, r, n, err := requirePR(*workspace, *repo, *id)
+	if err != nil {
+		return fail(d, err)
+	}
+	if d.PR == nil {
+		return fail(d, domain.Service("pr adapter not configured"))
+	}
+	approval, err := d.PR.Approve(ctx(), ws, r, n, *dry)
+	if err != nil {
+		return fail(d, err)
+	}
+	if *dry {
+		return success(d, format, prDryRun{
+			DryRun: true, Namespace: "pr", Verb: "approve", Repo: r, Workspace: ws, ID: n,
+		})
+	}
+	return success(d, format, approval)
 }
 
 func prMerge(args []string, d Deps, format string) int {

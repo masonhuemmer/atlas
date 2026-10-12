@@ -39,6 +39,7 @@ func TestWriteGateInjectsDryRun(t *testing.T) {
 		{"pr", "create"},
 		{"pr", "edit"},
 		{"pr", "comment"},
+		{"pr", "approve"},
 		{"pr", "merge"},
 		{"jsm", "create"},
 		{"jsm", "comment"},
@@ -107,7 +108,7 @@ func TestReadAllowlist(t *testing.T) {
 			t.Fatalf("%s %s", r[0], r[1])
 		}
 	}
-	for _, v := range [][2]string{{"jira", "comment"}, {"pr", "merge"}, {"confluence", "delete"}, {"auth", "login"}, {"auth", "logout"}, {"mcp", "serve"}} {
+	for _, v := range [][2]string{{"jira", "comment"}, {"pr", "approve"}, {"pr", "merge"}, {"confluence", "delete"}, {"auth", "login"}, {"auth", "logout"}, {"mcp", "serve"}} {
 		if isRead(v[0], v[1]) {
 			t.Fatalf("%s %s is not a read", v[0], v[1])
 		}
