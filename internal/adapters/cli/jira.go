@@ -17,6 +17,10 @@ func runJira(args []string, d Deps, format string) int {
 	switch verb {
 	case "get":
 		return jiraGet(args, d, format)
+	case "attachments":
+		return jiraAttachments(args, d, format)
+	case "download":
+		return jiraDownload(args, d, format)
 	case "search":
 		return jiraSearch(args, d, format)
 	case "suggest":

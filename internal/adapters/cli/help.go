@@ -49,10 +49,13 @@ Output: JSON (default) or --human.
 
 const jiraHelp = `atlas jira — licensed Jira on one cloud
 
-Verbs: get, search, suggest, users, boards, board, transitions, create, edit, comment, transition, link
+Verbs: get, attachments, download, search, suggest, users, boards, board, transitions, create, edit, comment, transition, link
 get:        atlas jira get KEY-1 [--fields comment,summary]
             get includes comments; use it after jira comment to verify the text persisted.
             --fields selects output fields; comment selects comments.
+attachments: atlas jira attachments KEY-1 [--site ALIAS]
+download:   atlas jira download KEY-1 --attachment ID --output PATH [--site ALIAS] [--dry-run]
+            output must be a new file; an existing file is never overwritten.
 search:     atlas jira search --jql 'project = KEY' [--limit 50] [--page-token TOKEN]
 suggest:    atlas jira suggest --query 'text' [--project KEY] [--site ALIAS]
 users:      atlas jira users --query 'Alex' --project KEY

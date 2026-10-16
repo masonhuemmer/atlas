@@ -11,6 +11,15 @@ type IssueLink struct {
 	Outward string `json:"outward"`
 }
 
+// JiraAttachment is metadata for a file attached to an issue.
+type JiraAttachment struct {
+	ID       string `json:"id"`
+	Filename string `json:"filename"`
+	Size     int64  `json:"size"`
+	MIMEType string `json:"mime_type,omitempty"`
+	Created  string `json:"created,omitempty"`
+}
+
 // Issue is one licensed Jira issue on a single cloud.
 // Site is the hostname. BrowseURL is https://<hostname>/browse/<KEY>.
 type Issue struct {

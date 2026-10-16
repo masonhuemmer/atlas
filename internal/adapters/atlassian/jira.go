@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"sort"
 	"strconv"
 	"strings"
@@ -47,6 +48,17 @@ func (j JiraAPI) Get(ctx context.Context, hostname, key string) (domain.Issue, e
 		return domain.Issue{}, domain.Service("jira memory not configured")
 	}
 	return j.Memory.Get(ctx, hostname, key)
+}
+
+func (j JiraAPI) Attachments(ctx context.Context, hostname, key string) ([]domain.JiraAttachment, error) {
+	if _, err := j.Get(ctx, hostname, key); err != nil {
+		return nil, err
+	}
+	return []domain.JiraAttachment{}, nil
+}
+
+func (j JiraAPI) DownloadAttachment(_ context.Context, _, _ string, _ io.Writer) (int64, error) {
+	return 0, domain.NotFound("attachment not found")
 }
 
 func (j JiraAPI) Search(ctx context.Context, hostname, jql string) (domain.SearchResult, error) {
