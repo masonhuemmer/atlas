@@ -96,7 +96,7 @@ atlas <namespace> <verb> [flags]
 | --- | --- |
 | `auth` | `login`, `status`, `logout` |
 | `site` | `list`, `resolve` |
-| `jira` | `get`, `search`, `suggest`, `users`, `boards`, `board placement`, `transitions`, `create`, `edit`, `comment`, `transition`, `link` |
+| `jira` | `get`, `attachments`, `download`, `search`, `suggest`, `users`, `boards`, `board placement`, `transitions`, `create`, `edit`, `comment`, `transition`, `link` |
 | `confluence` | `get`, `search`, `create`, `update`, `move` |
 | `pr` | `get`, `list`, `comments`, `create`, `edit`, `comment`, `approve`, `merge`, `diff` |
 | `jsm` | `desks`, `types`, `list`, `get`, `create`, `comment`, `transition` |
@@ -108,6 +108,8 @@ Confluence create and update convert Markdown bodies to Confluence storage marku
 Use `--parent PAGE_ID` to create a child page, or `atlas confluence move PAGE_ID --parent NEW_PARENT_ID --site ALIAS` to move a page under another page in the same space.
 
 For an internal note on a JSM customer request at a licensed site, use `atlas jira comment KEY-1 --body '...' --internal`. Atlas checks that the request is accessible, posts with internal visibility, and verifies the response. It never falls back to a public comment. `--dry-run` previews the command without checking site access.
+
+List an issue's files with `atlas jira attachments KEY-1`. Download one with `atlas jira download KEY-1 --attachment ID --output ./filename`. The attachment ID must belong to that issue. The output path must be a new file; Atlas will not overwrite an existing file. `--dry-run` previews the download without creating a file.
 
 Find an account ID before assigning a ticket with `atlas jira users --query 'Alex' --project SDO` or `atlas jira users --query 'Alex' --issue SDO-588`. The scoped forms return users Jira considers assignable to that project or issue. Use `--site ALIAS` without a scope for a general lookup. Results include `account_id`, display name, and email when Jira permits it. Pass the ID to `jira create --assignee ID` or `jira edit KEY-1 --assignee ID`.
 

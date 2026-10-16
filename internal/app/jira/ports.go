@@ -2,6 +2,7 @@ package jira
 
 import (
 	"context"
+	"io"
 
 	"github.com/masonhuemmer/atlas/internal/domain"
 )
@@ -9,6 +10,8 @@ import (
 // Store is licensed Jira on one hostname. Fake memory and live REST both implement it.
 type Store interface {
 	Get(ctx context.Context, hostname, key string) (domain.Issue, error)
+	Attachments(ctx context.Context, hostname, key string) ([]domain.JiraAttachment, error)
+	DownloadAttachment(ctx context.Context, hostname, id string, dst io.Writer) (int64, error)
 	Search(ctx context.Context, hostname, jql string) (domain.SearchResult, error)
 	SearchPage(ctx context.Context, hostname, jql string, limit int, pageToken string) (domain.SearchResult, error)
 	Suggest(ctx context.Context, hostname, query, project string) (domain.IssueSuggestions, error)
