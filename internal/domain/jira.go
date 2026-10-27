@@ -22,12 +22,13 @@ type JiraAttachment struct {
 
 // JiraComment identifies one comment on a licensed Jira issue.
 type JiraComment struct {
-	ID              string `json:"id"`
-	Body            string `json:"body"`
-	Author          string `json:"author,omitempty"`
-	AuthorAccountID string `json:"author_account_id,omitempty"`
-	Created         string `json:"created,omitempty"`
-	Updated         string `json:"updated,omitempty"`
+	ID                 string `json:"id"`
+	Body               string `json:"body"`
+	UnsupportedContent string `json:"unsupported_content,omitempty"`
+	Author             string `json:"author,omitempty"`
+	AuthorAccountID    string `json:"author_account_id,omitempty"`
+	Created            string `json:"created,omitempty"`
+	Updated            string `json:"updated,omitempty"`
 }
 
 type JiraCommentPage struct {

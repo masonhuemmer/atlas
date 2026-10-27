@@ -93,3 +93,44 @@ func TestJiraCommentPermissionError(t *testing.T) {
 		t.Fatalf("edit=%v delete=%v", editErr, deleteErr)
 	}
 }
+
+func TestJiraEditCommentRefusesUnsupportedADFBeforeWrite(t *testing.T) {
+	putCalls := 0
+	rich := map[string]any{"type": "doc", "version": 1, "content": []any{map[string]any{
+		"type": "paragraph", "content": []any{
+			map[string]any{"type": "text", "text": "Hello "},
+			map[string]any{"type": "mention", "attrs": map[string]any{"id": "user-1", "text": "@Mason"}},
+			map[string]any{"type": "emoji", "attrs": map[string]any{"shortName": ":grinning:", "text": "😀"}},
+		},
+	}}}
+	c, _ := liveClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPut {
+			putCalls++
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"id": "123", "body": rich})
+	}))
+	j := Jira{Client: c}
+	current, err := j.GetComment(context.Background(), "dev.example.atlassian.net", "ABC-1", "123")
+	if err != nil || current.UnsupportedContent != "mention" {
+		t.Fatalf("current=%+v err=%v", current, err)
+	}
+	_, err = j.EditComment(context.Background(), "dev.example.atlassian.net", "ABC-1", "123", "replacement")
+	if domain.ClassOf(err) != domain.ClassUsage || putCalls != 0 {
+		t.Fatalf("edit=%v PUT calls=%d", err, putCalls)
+	}
+}
+
+func TestUnsupportedCommentADFMarks(t *testing.T) {
+	supported := map[string]any{"type": "doc", "content": []any{map[string]any{"type": "paragraph", "content": []any{
+		map[string]any{"type": "text", "text": "bold", "marks": []any{map[string]any{"type": "strong"}}},
+	}}}}
+	if got := unsupportedCommentADF(supported); got != "" {
+		t.Fatalf("supported markup flagged: %s", got)
+	}
+	unsupported := map[string]any{"type": "doc", "content": []any{map[string]any{"type": "paragraph", "content": []any{
+		map[string]any{"type": "text", "text": "color", "marks": []any{map[string]any{"type": "textColor"}}},
+	}}}}
+	if got := unsupportedCommentADF(unsupported); got != "textColor mark" {
+		t.Fatalf("unsupported mark: %s", got)
+	}
+}

@@ -1,11 +1,28 @@
 package cli
 
 import (
+	"context"
 	"encoding/json"
 	"testing"
 
+	"github.com/masonhuemmer/atlas/internal/app/jira"
 	"github.com/masonhuemmer/atlas/internal/domain"
 )
+
+type richCommentStore struct{ jira.Store }
+
+func (s richCommentStore) GetComment(context.Context, string, string, string) (domain.JiraComment, error) {
+	return domain.JiraComment{ID: "123", Body: "Visible text", UnsupportedContent: "mention"}, nil
+}
+
+func TestJiraCommentEditDryRunRefusesRichContent(t *testing.T) {
+	d, _, errw := testDeps()
+	d.Jira = richCommentStore{Store: d.Jira}
+	code := Run([]string{"atlas", "jira", "comment", "edit", "SDO-1", "--id", "123", "--body", "replacement", "--dry-run"}, d)
+	if code != domain.ExitUsage {
+		t.Fatalf("exit=%d error=%s", code, errw.String())
+	}
+}
 
 func TestJiraCommentEditDeleteFlow(t *testing.T) {
 	d, out, errw := testDeps()

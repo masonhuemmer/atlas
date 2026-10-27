@@ -75,6 +75,9 @@ func jiraCommentEdit(args []string, d Deps, format string) int {
 		if err != nil {
 			return fail(d, err)
 		}
+		if current.UnsupportedContent != "" {
+			return fail(d, domain.Usage("comment contains rich Jira content Atlas cannot preserve").WithHint("Edit this comment in Jira; unsupported content: "+current.UnsupportedContent))
+		}
 		return success(d, format, map[string]any{"dry_run": true, "key": strings.ToUpper(key), "action": "edit", "current": current, "body": *body})
 	}
 	updated, err := d.Jira.EditComment(ctx(), site.Hostname, key, *id, *body)

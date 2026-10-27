@@ -72,6 +72,7 @@ edit:       atlas jira edit SUBTASK-2 --parent KEY-1  (or --fields '{...}')
 assign:     atlas jira edit KEY-1 --assignee ACCOUNT_ID
 comment:    atlas jira comment KEY-1 --body '...' [--internal]
 edit comment: atlas jira comment edit KEY-1 --id ID --body '...' [--dry-run]
+            editing refuses existing rich ADF nodes that Markdown cannot preserve.
 delete comment: atlas jira comment delete KEY-1 --id ID [--dry-run]
 transition: atlas jira transition KEY-1 --name Done (or --id from jira transitions)
 link:       atlas jira link KEY-1 OTHER-2 [--type Relates]

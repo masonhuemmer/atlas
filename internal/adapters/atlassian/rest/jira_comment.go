@@ -66,6 +66,13 @@ func (j Jira) GetComment(ctx context.Context, hostname, key, id string) (domain.
 }
 
 func (j Jira) EditComment(ctx context.Context, hostname, key, id, body string) (domain.JiraComment, error) {
+	current, err := j.GetComment(ctx, hostname, key, id)
+	if err != nil {
+		return domain.JiraComment{}, err
+	}
+	if current.UnsupportedContent != "" {
+		return domain.JiraComment{}, domain.Usage("comment contains rich Jira content Atlas cannot preserve").WithHint("Edit this comment in Jira; unsupported content: " + current.UnsupportedContent)
+	}
 	cred, err := j.credForHost(hostname)
 	if err != nil {
 		return domain.JiraComment{}, err
@@ -109,9 +116,47 @@ func jiraCommentFromREST(raw map[string]any) domain.JiraComment {
 	author := asMap(raw["author"])
 	return domain.JiraComment{
 		ID: str(raw, "id"), Body: markdownFromADF(raw["body"]),
-		Author: str(author, "displayName"), AuthorAccountID: str(author, "accountId"),
+		UnsupportedContent: unsupportedCommentADF(raw["body"]),
+		Author:             str(author, "displayName"), AuthorAccountID: str(author, "accountId"),
 		Created: str(raw, "created"), Updated: str(raw, "updated"),
 	}
+}
+
+// unsupportedCommentADF names the first ADF node or mark that the Markdown
+// reader cannot carry back through adfFromMarkdown during a comment edit.
+func unsupportedCommentADF(body any) string {
+	if _, ok := body.(string); ok {
+		return ""
+	}
+	return unsupportedCommentNode(asMap(body))
+}
+
+func unsupportedCommentNode(node map[string]any) string {
+	typ := str(node, "type")
+	switch typ {
+	case "doc", "paragraph", "heading", "bulletList", "orderedList", "listItem", "codeBlock", "blockquote", "rule", "text", "hardBreak":
+	case "":
+		return "unknown ADF node"
+	default:
+		return typ
+	}
+	for _, raw := range asList(node["marks"]) {
+		mark := str(asMap(raw), "type")
+		switch mark {
+		case "strong", "em", "code", "strike", "link":
+		default:
+			if mark == "" {
+				mark = "unknown"
+			}
+			return mark + " mark"
+		}
+	}
+	for _, raw := range asList(node["content"]) {
+		if unsupported := unsupportedCommentNode(asMap(raw)); unsupported != "" {
+			return unsupported
+		}
+	}
+	return ""
 }
 
 func parseJiraComment(body []byte, id string) (domain.JiraComment, error) {

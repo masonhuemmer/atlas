@@ -57,6 +57,7 @@ keys map to an alias. JQL/CQL that names two sites is usage. A
 | Get issue | `atlas_read` `namespace=jira` `verb=get` `args=["KEY-1"]` |
 | Find comment IDs | `atlas_read` `namespace=jira` `verb=comments` `args=["KEY-1"]`; follow `next_start_at` with `flags={start-at:N}` if needed |
 | Edit a comment | `atlas_write` `namespace=jira` `verb=comment` `args=["edit","KEY-1"]` `flags={id:"ID",body:"replacement"}` + `write_opt_in` |
+| Rich comment edit blocked | If `unsupported_content` appears in `jira comments`, edit that comment in Jira; Atlas rejects a Markdown replacement that would discard the rich node |
 | Delete a comment | `atlas_write` `namespace=jira` `verb=comment` `args=["delete","KEY-1"]` `flags={id:"ID"}` + `write_opt_in`; select the ID from `jira comments` |
 | List issue attachments | `atlas_read` `namespace=jira` `verb=attachments` `args=["KEY-1"]`; returns IDs and filenames |
 | Download an issue attachment | `atlas_write` `namespace=jira` `verb=download` `args=["KEY-1"]` `flags={attachment:"ID",output:"PATH"}` + `write_opt_in`; choose a new local path |
