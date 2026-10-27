@@ -18,6 +18,8 @@ import (
 type Memory struct {
 	mu             sync.Mutex
 	issues         map[string]domain.Issue
+	comments       map[string][]domain.JiraComment
+	nextCommentID  int
 	users          []domain.JiraUser
 	transitions    map[string][]string
 	next           map[string]int
@@ -115,6 +117,34 @@ func (j JiraAPI) CommentInternal(ctx context.Context, hostname, key, body string
 		return domain.Service("jira memory not configured")
 	}
 	return j.Memory.CommentInternal(ctx, hostname, key, body, dryRun)
+}
+
+func (j JiraAPI) Comments(ctx context.Context, hostname, key string, startAt, limit int) (domain.JiraCommentPage, error) {
+	if j.Memory == nil {
+		return domain.JiraCommentPage{}, domain.Service("jira memory not configured")
+	}
+	return j.Memory.Comments(ctx, hostname, key, startAt, limit)
+}
+
+func (j JiraAPI) GetComment(ctx context.Context, hostname, key, id string) (domain.JiraComment, error) {
+	if j.Memory == nil {
+		return domain.JiraComment{}, domain.Service("jira memory not configured")
+	}
+	return j.Memory.GetComment(ctx, hostname, key, id)
+}
+
+func (j JiraAPI) EditComment(ctx context.Context, hostname, key, id, body string) (domain.JiraComment, error) {
+	if j.Memory == nil {
+		return domain.JiraComment{}, domain.Service("jira memory not configured")
+	}
+	return j.Memory.EditComment(ctx, hostname, key, id, body)
+}
+
+func (j JiraAPI) DeleteComment(ctx context.Context, hostname, key, id string) error {
+	if j.Memory == nil {
+		return domain.Service("jira memory not configured")
+	}
+	return j.Memory.DeleteComment(ctx, hostname, key, id)
 }
 
 func (j JiraAPI) Transition(ctx context.Context, hostname, key, name string, dryRun bool) (domain.Issue, error) {
@@ -344,6 +374,11 @@ func (m *Memory) Comment(_ context.Context, hostname, key, body string, dryRun b
 		return nil
 	}
 	iss.Comments = append(append([]string(nil), iss.Comments...), body)
+	m.nextCommentID++
+	if m.comments == nil {
+		m.comments = map[string][]domain.JiraComment{}
+	}
+	m.comments[memKey(hostname, key)] = append(m.comments[memKey(hostname, key)], domain.JiraComment{ID: strconv.Itoa(m.nextCommentID), Body: body})
 	m.putLocked(iss)
 	return nil
 }

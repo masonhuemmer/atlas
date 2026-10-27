@@ -20,6 +20,28 @@ type JiraAttachment struct {
 	Created  string `json:"created,omitempty"`
 }
 
+// JiraComment identifies one comment on a licensed Jira issue.
+type JiraComment struct {
+	ID                 string `json:"id"`
+	Body               string `json:"body"`
+	UnsupportedContent string `json:"unsupported_content,omitempty"`
+	Author             string `json:"author,omitempty"`
+	AuthorAccountID    string `json:"author_account_id,omitempty"`
+	Created            string `json:"created,omitempty"`
+	Updated            string `json:"updated,omitempty"`
+}
+
+type JiraCommentPage struct {
+	Key         string        `json:"key"`
+	Site        string        `json:"site"`
+	Total       int           `json:"total"`
+	StartAt     int           `json:"start_at"`
+	Limit       int           `json:"limit"`
+	Comments    []JiraComment `json:"comments"`
+	NextStartAt int           `json:"next_start_at,omitempty"`
+	IsLast      bool          `json:"is_last"`
+}
+
 // Issue is one licensed Jira issue on a single cloud.
 // Site is the hostname. BrowseURL is https://<hostname>/browse/<KEY>.
 type Issue struct {

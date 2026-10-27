@@ -7,7 +7,7 @@ Usage: atlas <namespace> <verb> [flags]
 Namespaces:
   auth         sign in, status, logout (core, not a workload)
   site         list and resolve clouds from config
-  jira         get, search, suggest, users, boards, board, transitions, create, edit, comment, transition, link
+  jira         get, comments, search, suggest, users, boards, board, transitions, create, edit, comment, transition, link
   confluence   get, search, create, update (no delete)
   pr           get, list, comments, create, edit, comment, approve, merge, diff (no delete)
   jsm          customer REST: desks, types, list, get, create, comment, transition
@@ -49,10 +49,12 @@ Output: JSON (default) or --human.
 
 const jiraHelp = `atlas jira — licensed Jira on one cloud
 
-Verbs: get, attachments, download, search, suggest, users, boards, board, transitions, create, edit, comment, transition, link
+Verbs: get, comments, attachments, download, search, suggest, users, boards, board, transitions, create, edit, comment, transition, link
 get:        atlas jira get KEY-1 [--fields comment,summary]
             get includes comments; use it after jira comment to verify the text persisted.
             --fields selects output fields; comment selects comments.
+comments:   atlas jira comments KEY-1 [--start-at 0] [--limit 50]
+            lists comment IDs, bodies, and authors; use next_start_at for another page.
 attachments: atlas jira attachments KEY-1 [--site ALIAS]
 download:   atlas jira download KEY-1 --attachment ID --output PATH [--site ALIAS] [--dry-run]
             output must be a new file; an existing file is never overwritten.
@@ -69,6 +71,9 @@ create sub-task: atlas jira create --project KEY --type Sub-task --summary '...'
 edit:       atlas jira edit SUBTASK-2 --parent KEY-1  (or --fields '{...}')
 assign:     atlas jira edit KEY-1 --assignee ACCOUNT_ID
 comment:    atlas jira comment KEY-1 --body '...' [--internal]
+edit comment: atlas jira comment edit KEY-1 --id ID --body '...' [--dry-run]
+            editing refuses existing rich ADF nodes that Markdown cannot preserve.
+delete comment: atlas jira comment delete KEY-1 --id ID [--dry-run]
 transition: atlas jira transition KEY-1 --name Done (or --id from jira transitions)
 link:       atlas jira link KEY-1 OTHER-2 [--type Relates]
 

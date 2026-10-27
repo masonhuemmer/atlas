@@ -23,6 +23,10 @@ type Store interface {
 	Edit(ctx context.Context, hostname, key string, fields map[string]any, dryRun bool) (domain.Issue, error)
 	Comment(ctx context.Context, hostname, key, body string, dryRun bool) error
 	CommentInternal(ctx context.Context, hostname, key, body string, dryRun bool) error
+	Comments(ctx context.Context, hostname, key string, startAt, limit int) (domain.JiraCommentPage, error)
+	GetComment(ctx context.Context, hostname, key, id string) (domain.JiraComment, error)
+	EditComment(ctx context.Context, hostname, key, id, body string) (domain.JiraComment, error)
+	DeleteComment(ctx context.Context, hostname, key, id string) error
 	Transition(ctx context.Context, hostname, key, name string, dryRun bool) (domain.Issue, error)
 	TransitionID(ctx context.Context, hostname, key, id string, dryRun bool) (domain.Issue, error)
 	Link(ctx context.Context, hostname, inward, outward, linkType string, dryRun bool) error

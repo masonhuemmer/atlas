@@ -96,7 +96,7 @@ atlas <namespace> <verb> [flags]
 | --- | --- |
 | `auth` | `login`, `status`, `logout` |
 | `site` | `list`, `resolve` |
-| `jira` | `get`, `attachments`, `download`, `search`, `suggest`, `users`, `boards`, `board placement`, `transitions`, `create`, `edit`, `comment`, `transition`, `link` |
+| `jira` | `get`, `comments`, `attachments`, `download`, `search`, `suggest`, `users`, `boards`, `board placement`, `transitions`, `create`, `edit`, `comment`, `transition`, `link` |
 | `confluence` | `get`, `search`, `create`, `update`, `move` |
 | `pr` | `get`, `list`, `comments`, `create`, `edit`, `comment`, `approve`, `merge`, `diff` |
 | `jsm` | `desks`, `types`, `list`, `get`, `create`, `comment`, `transition` |
@@ -108,6 +108,9 @@ Confluence create and update convert Markdown bodies to Confluence storage marku
 Use `--parent PAGE_ID` to create a child page, or `atlas confluence move PAGE_ID --parent NEW_PARENT_ID --site ALIAS` to move a page under another page in the same space.
 
 For an internal note on a JSM customer request at a licensed site, use `atlas jira comment KEY-1 --body '...' --internal`. Atlas checks that the request is accessible, posts with internal visibility, and verifies the response. It never falls back to a public comment. `--dry-run` previews the command without checking site access.
+
+To change an existing Jira comment, run `atlas jira comments CAB-119` to find its ID, then `atlas jira comment edit CAB-119 --id ID --body 'replacement text'`. To remove it, use `atlas jira comment delete CAB-119 --id ID`. Both commands support `--dry-run`; deletion previews the comment before removing it. Jira requires Edit Own/All Comments or Delete Own/All Comments permission, respectively. The edit changes the body only.
+Atlas refuses to edit a comment when it detects unsupported rich Jira nodes or marks, such as mentions and emoji; edit such a comment in Jira instead.
 
 List an issue's files with `atlas jira attachments KEY-1`. Download one with `atlas jira download KEY-1 --attachment ID --output ./filename`. The attachment ID must belong to that issue. The output path must be a new file; Atlas will not overwrite an existing file. `--dry-run` previews the download without creating a file.
 

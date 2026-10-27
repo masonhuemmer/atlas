@@ -17,6 +17,8 @@ func runJira(args []string, d Deps, format string) int {
 	switch verb {
 	case "get":
 		return jiraGet(args, d, format)
+	case "comments":
+		return jiraComments(args, d, format)
 	case "attachments":
 		return jiraAttachments(args, d, format)
 	case "download":
@@ -378,6 +380,14 @@ func jiraEdit(args []string, d Deps, format string) int {
 }
 
 func jiraComment(args []string, d Deps, format string) int {
+	if len(args) > 0 {
+		switch args[0] {
+		case "edit":
+			return jiraCommentEdit(args[1:], d, format)
+		case "delete":
+			return jiraCommentDelete(args[1:], d, format)
+		}
+	}
 	if hasHelp(args) {
 		return writeHelp(d.Stdout, jiraHelp)
 	}
