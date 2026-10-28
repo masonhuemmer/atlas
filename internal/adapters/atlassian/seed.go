@@ -7,12 +7,14 @@ import (
 	"runtime"
 	"strconv"
 
+	"github.com/masonhuemmer/atlas/internal/adapters/atlassian/rest"
 	"github.com/masonhuemmer/atlas/internal/domain"
 )
 
 const seedPageID = "100"
 
 type seedFile struct {
+	Fields []seedField `json:"custom_fields"`
 	Issues []seedIssue `json:"issues"`
 	Users  []seedUser  `json:"users"`
 	Pages  []seedPage  `json:"pages"`
@@ -30,6 +32,19 @@ type seedUser struct {
 	Active      bool   `json:"active"`
 }
 
+type seedField struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	Type string `json:"type"`
+}
+
+type seedChange struct {
+	Created string `json:"created"`
+	Author  string `json:"author"`
+	From    string `json:"from"`
+	To      string `json:"to"`
+}
+
 type seedIssue struct {
 	Key         string   `json:"key"`
 	Alias       string   `json:"alias"`
@@ -45,6 +60,9 @@ type seedIssue struct {
 	Updated     string   `json:"updated"`
 	Project     string   `json:"project"`
 	Transitions []string `json:"transitions"`
+	// Custom holds raw REST values by customfield_ id, as Jira returns them.
+	Custom  map[string]any `json:"custom"`
+	History []seedChange   `json:"history"`
 }
 
 type seedPage struct {
@@ -106,6 +124,9 @@ func Seed() *Memory {
 		requests:       map[string]domain.CustomerRequest{},
 		jsmTransitions: map[string][]string{},
 		nextReq:        map[string]int{},
+		customMeta:     map[string]rest.FieldMeta{},
+		custom:         map[string]map[string]any{},
+		history:        map[string][]domain.StatusChange{},
 	}
 	var f seedFile
 	b, err := os.ReadFile(seedDataPath())
@@ -114,6 +135,9 @@ func Seed() *Memory {
 	}
 	if err := json.Unmarshal(b, &f); err != nil {
 		panic("atlas seed: " + err.Error())
+	}
+	for _, field := range f.Fields {
+		m.customMeta[field.ID] = rest.FieldMeta{Name: field.Name, Type: field.Type}
 	}
 	for _, iss := range f.Issues {
 		host := hostForAlias(iss.Alias)
@@ -125,6 +149,14 @@ func Seed() *Memory {
 			Created: iss.Created, Updated: iss.Updated, Project: iss.Project,
 		}
 		m.put(item)
+		if len(iss.Custom) > 0 {
+			m.custom[memKey(host, iss.Key)] = iss.Custom
+		}
+		for _, change := range iss.History {
+			m.history[memKey(host, iss.Key)] = append(m.history[memKey(host, iss.Key)], domain.StatusChange{
+				Created: change.Created, Author: change.Author, From: change.From, To: change.To,
+			})
+		}
 		trans := iss.Transitions
 		if len(trans) == 0 {
 			trans = []string{"Done"}

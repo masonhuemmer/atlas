@@ -10,6 +10,9 @@ import (
 // Store is licensed Jira on one hostname. Fake memory and live REST both implement it.
 type Store interface {
 	Get(ctx context.Context, hostname, key string) (domain.Issue, error)
+	// GetCustom reads what Get leaves out: ids and all select custom fields,
+	// history adds the status transitions from the changelog.
+	GetCustom(ctx context.Context, hostname, key string, ids []string, all, history bool) (domain.IssueCustom, error)
 	Attachments(ctx context.Context, hostname, key string) ([]domain.JiraAttachment, error)
 	DownloadAttachment(ctx context.Context, hostname, id string, dst io.Writer) (int64, error)
 	Search(ctx context.Context, hostname, jql string) (domain.SearchResult, error)

@@ -122,6 +122,22 @@ Find a board with `atlas jira boards --project SDO`, then run `atlas jira board 
 
 Create a sub-task under a story with `atlas jira create --project KEY --type Sub-task --summary '...' --parent KEY-1`. Reparent an existing sub-task with `atlas jira edit KEY-2 --parent KEY-1`. Both issues must be in the same project. Jira must allow the chosen issue type and parent. `atlas jira get KEY-2` shows the `parent` key. For a regular issue link without changing the parent, use `atlas jira link KEY-1 KEY-2 [--type Relates]`.
 
+Read custom fields and status history with `--fields`: `atlas jira get KEY-1 --fields custom,history`. `custom` returns every non-empty custom field, `customfield_NNNNN` returns that one field, and `history` returns the status transitions from the changelog. They combine with the issue fields (`--fields summary,status,custom,history`) and the default output is unchanged without `--fields`. The output gains `custom_fields` and `status_history`, and both keys are left out when empty:
+
+```json
+{
+  "key": "SDO-1",
+  "custom_fields": [
+    {"id": "customfield_10481", "name": "Peer Reviewer", "type": "userpicker", "text": "Avery Example"}
+  ],
+  "status_history": [
+    {"created": "2026-09-01T09:30:00.000+0000", "author": "Alex Example", "from": "To Do", "to": "In Progress"}
+  ]
+}
+```
+
+`type` is the last segment of the field's `schema.custom` (`textarea`, `userpicker`, `select`, ...), or the schema type. `text` is the value flattened to plain text: rich-text fields get a newline between blocks, users show their display name, options their value (a cascading select as `parent / child`), and lists are joined with `; `. Custom fields come from `GET /rest/api/3/field` plus one issue read, and history pages through the whole changelog. A response cut off by the 1 MiB read limit is a `service` error, never an empty result.
+
 Jira issue descriptions and public comments accept Markdown. Atlas converts headings, lists, emphasis, links, code, and tables to Jira's rich-text document format when writing. Existing descriptions stored as literal Markdown need to be edited once to render with formatting.
 
 ## MCP

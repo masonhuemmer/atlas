@@ -57,11 +57,11 @@ func jiraGet(args []string, d Deps, format string) int {
 	fsset := flag.NewFlagSet("jira get", flag.ContinueOnError)
 	fsset.SetOutput(d.Stderr)
 	siteFlag := fsset.String("site", "", "site alias, hostname, or UUID")
-	fieldsFlag := fsset.String("fields", "", "comma-separated output fields (comment selects comments)")
+	fieldsFlag := fsset.String("fields", "", "comma-separated output fields (comment selects comments, custom and customfield_N select custom fields, history selects status history)")
 	if err := parseMixed(fsset, args); err != nil {
 		return fail(d, domain.Usage(err.Error()))
 	}
-	fields, err := jiraGetFields(*fieldsFlag)
+	sel, err := jiraGetFields(*fieldsFlag)
 	if err != nil {
 		return fail(d, err)
 	}
@@ -83,45 +83,80 @@ func jiraGet(args []string, d Deps, format string) int {
 	if err != nil {
 		return fail(d, err)
 	}
-	if len(fields) > 0 {
-		fullJSON, _ := json.Marshal(iss)
-		var full map[string]any
-		_ = json.Unmarshal(fullJSON, &full)
-		selected := map[string]any{"key": iss.Key, "site": iss.Site, "browse_url": iss.BrowseURL}
-		for _, field := range fields {
-			if value, ok := full[field]; ok {
-				selected[field] = value
-			} else if field == "comments" {
-				selected[field] = []string{}
-			}
-		}
-		return success(d, format, selected)
+	if !sel.any() {
+		return success(d, format, iss)
 	}
-	return success(d, format, iss)
+	fullJSON, _ := json.Marshal(iss)
+	var full map[string]any
+	_ = json.Unmarshal(fullJSON, &full)
+	selected := map[string]any{"key": iss.Key, "site": iss.Site, "browse_url": iss.BrowseURL}
+	for _, field := range sel.fields {
+		if value, ok := full[field]; ok {
+			selected[field] = value
+		} else if field == "comments" {
+			selected[field] = []string{}
+		}
+	}
+	if sel.custom || len(sel.customIDs) > 0 || sel.history {
+		extra, err := d.Jira.GetCustom(ctx(), site.Hostname, key, sel.customIDs, sel.custom, sel.history)
+		if err != nil {
+			return fail(d, err)
+		}
+		if len(extra.CustomFields) > 0 {
+			selected["custom_fields"] = extra.CustomFields
+		}
+		if len(extra.StatusHistory) > 0 {
+			selected["status_history"] = extra.StatusHistory
+		}
+	}
+	return success(d, format, selected)
 }
 
-func jiraGetFields(raw string) ([]string, error) {
+// jiraGetSelection is a parsed jira get --fields value.
+type jiraGetSelection struct {
+	fields    []string // top-level issue keys, as in the issue JSON
+	custom    bool     // every non-empty custom field
+	customIDs []string // customfield_N tokens
+	history   bool     // status transitions from the changelog
+}
+
+func (s jiraGetSelection) any() bool {
+	return len(s.fields) > 0 || s.custom || len(s.customIDs) > 0 || s.history
+}
+
+var customFieldToken = regexp.MustCompile(`^customfield_\d+$`)
+
+func jiraGetFields(raw string) (jiraGetSelection, error) {
+	var sel jiraGetSelection
 	if strings.TrimSpace(raw) == "" {
-		return nil, nil
+		return sel, nil
 	}
 	allowed := map[string]bool{
 		"summary": true, "description": true, "status": true, "status_id": true,
 		"issuetype": true, "parent": true, "priority": true, "labels": true,
 		"assignee": true, "reporter": true, "created": true, "updated": true,
 		"project": true, "comments": true, "links": true,
+		"key": true, // always present; accepted so callers can list it
 	}
-	var fields []string
 	for _, rawField := range strings.Split(raw, ",") {
 		field := strings.ToLower(strings.TrimSpace(rawField))
-		if field == "comment" {
-			field = "comments"
+		switch {
+		case field == "comment":
+			sel.fields = append(sel.fields, "comments")
+		case field == "custom":
+			sel.custom = true
+		case field == "history":
+			sel.history = true
+		case customFieldToken.MatchString(field):
+			sel.customIDs = append(sel.customIDs, field)
+		case allowed[field]:
+			sel.fields = append(sel.fields, field)
+		default:
+			return sel, domain.Usagef("unknown jira get field %q", rawField).
+				WithHint("issue fields, comment, custom, customfield_NNNNN, or history")
 		}
-		if !allowed[field] {
-			return nil, domain.Usagef("unknown jira get field %q", rawField)
-		}
-		fields = append(fields, field)
 	}
-	return fields, nil
+	return sel, nil
 }
 
 func jiraSearch(args []string, d Deps, format string) int {

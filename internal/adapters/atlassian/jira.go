@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/masonhuemmer/atlas/internal/adapters/atlassian/rest"
 	"github.com/masonhuemmer/atlas/internal/domain"
 )
 
@@ -38,6 +39,9 @@ type Memory struct {
 	lastComment    domain.Comment
 	lastCreate     map[string]any
 	searchCalls    int
+	customMeta     map[string]rest.FieldMeta
+	custom         map[string]map[string]any
+	history        map[string][]domain.StatusChange
 }
 
 // JiraAPI is the in-process adapter used by ATLAS_FAKE and tests.
@@ -50,6 +54,13 @@ func (j JiraAPI) Get(ctx context.Context, hostname, key string) (domain.Issue, e
 		return domain.Issue{}, domain.Service("jira memory not configured")
 	}
 	return j.Memory.Get(ctx, hostname, key)
+}
+
+func (j JiraAPI) GetCustom(ctx context.Context, hostname, key string, ids []string, all, history bool) (domain.IssueCustom, error) {
+	if j.Memory == nil {
+		return domain.IssueCustom{}, domain.Service("jira memory not configured")
+	}
+	return j.Memory.GetCustom(ctx, hostname, key, ids, all, history)
 }
 
 func (j JiraAPI) Attachments(ctx context.Context, hostname, key string) ([]domain.JiraAttachment, error) {
@@ -181,6 +192,33 @@ func (m *Memory) Get(_ context.Context, hostname, key string) (domain.Issue, err
 		return domain.Issue{}, domain.NotFound("issue not found").WithHint("check the key and site")
 	}
 	return cloneIssue(iss), nil
+}
+
+// GetCustom serves the seeded custom fields and status history. Field
+// selection and text flattening are the live adapter's own code.
+func (m *Memory) GetCustom(_ context.Context, hostname, key string, ids []string, all, history bool) (domain.IssueCustom, error) {
+	if m == nil {
+		return domain.IssueCustom{}, domain.Service("jira memory not configured")
+	}
+	hostname = strings.TrimSpace(hostname)
+	key = strings.ToUpper(strings.TrimSpace(key))
+	if hostname == "" || key == "" {
+		return domain.IssueCustom{}, domain.Usage("hostname and issue key are required")
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	lookup := memKey(hostname, key)
+	if _, ok := m.issues[lookup]; !ok {
+		return domain.IssueCustom{}, domain.NotFound("issue not found").WithHint("check the key and site")
+	}
+	var out domain.IssueCustom
+	if all || len(ids) > 0 {
+		out.CustomFields = rest.BuildCustomFields(m.custom[lookup], m.customMeta, ids, all)
+	}
+	if history {
+		out.StatusHistory = append([]domain.StatusChange(nil), m.history[lookup]...)
+	}
+	return out, nil
 }
 
 func (m *Memory) Search(_ context.Context, hostname, jql string) (domain.SearchResult, error) {

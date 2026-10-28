@@ -53,6 +53,10 @@ Verbs: get, comments, attachments, download, search, suggest, users, boards, boa
 get:        atlas jira get KEY-1 [--fields comment,summary]
             get includes comments; use it after jira comment to verify the text persisted.
             --fields selects output fields; comment selects comments.
+            --fields custom adds custom_fields: every non-empty custom field as {id,name,type,text}.
+            --fields customfield_10538 adds just that field; empty or absent fields are omitted.
+            --fields history adds status_history: [{created,author,from,to}] from the changelog.
+            The tokens combine: --fields summary,status,custom,history. Without --fields the output is unchanged.
 comments:   atlas jira comments KEY-1 [--start-at 0] [--limit 50]
             lists comment IDs, bodies, and authors; use next_start_at for another page.
 attachments: atlas jira attachments KEY-1 [--site ALIAS]

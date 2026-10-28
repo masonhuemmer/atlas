@@ -55,6 +55,7 @@ keys map to an alias. JQL/CQL that names two sites is usage. A
 | Status | `atlas_status` |
 | Help / recipe | `atlas_help` `topic=jira-search` (or namespace/verb) |
 | Get issue | `atlas_read` `namespace=jira` `verb=get` `args=["KEY-1"]` |
+| Get custom fields / status history | `atlas_read` `namespace=jira` `verb=get` `args=["KEY-1"]` `flags={fields:"custom,history"}`; `custom` is every non-empty custom field, `customfield_NNNNN` one field, `history` the status transitions. Output gains `custom_fields` `[{id,name,type,text}]` and `status_history` `[{created,author,from,to}]`; empty fields and an empty history are left out |
 | Find comment IDs | `atlas_read` `namespace=jira` `verb=comments` `args=["KEY-1"]`; follow `next_start_at` with `flags={start-at:N}` if needed |
 | Edit a comment | `atlas_write` `namespace=jira` `verb=comment` `args=["edit","KEY-1"]` `flags={id:"ID",body:"replacement"}` + `write_opt_in` |
 | Rich comment edit blocked | If `unsupported_content` appears in `jira comments`, edit that comment in Jira; Atlas rejects a Markdown replacement that would discard the rich node |

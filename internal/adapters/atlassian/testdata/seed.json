@@ -1,4 +1,10 @@
 {
+  "custom_fields": [
+    {"id":"customfield_10481","name":"Peer Reviewer","type":"userpicker"},
+    {"id":"customfield_10538","name":"Notification of Changes","type":"textarea"},
+    {"id":"customfield_10601","name":"Region","type":"cascadingselect"},
+    {"id":"customfield_10602","name":"Environments","type":"multiselect"}
+  ],
   "users": [
     {"alias":"sesamidevel","account_id":"acct-alex","display_name":"Alex Example","email":"alex@example.test","active":true},
     {"alias":"sesamidevel","account_id":"acct-avery","display_name":"Avery Example","email":"avery@example.test","active":true},
@@ -19,7 +25,17 @@
       "created": "2026-09-01T00:00:00Z",
       "updated": "2026-09-20T00:00:00Z",
       "project": "SDO",
-      "transitions": ["Done"]
+      "transitions": ["Done"],
+      "custom": {
+        "customfield_10538": {"type":"doc","version":1,"content":[{"type":"paragraph","content":[{"type":"text","text":"Alex Example ; Avery Example"}]}]},
+        "customfield_10481": {"accountId":"acct-avery","displayName":"Avery Example"},
+        "customfield_10601": {"value":"EMEA","child":{"value":"Frankfurt"}},
+        "customfield_10602": []
+      },
+      "history": [
+        {"created":"2026-09-01T09:30:00.000+0000","author":"Alex Example","from":"To Do","to":"In Progress"},
+        {"created":"2026-09-02T14:05:00.000+0000","author":"Avery Example","from":"In Progress","to":"To Do"}
+      ]
     },
     {
       "key": "SDP-1",
