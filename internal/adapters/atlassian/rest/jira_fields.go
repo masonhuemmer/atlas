@@ -57,6 +57,11 @@ func prepareWriteFields(fields map[string]any, catalog FieldCatalog) (map[string
 	return out, nil
 }
 
+// MarkdownFromADF renders a description value, an ADF document or a string,
+// as the Markdown that jira get shows. The fake adapter uses it to store an
+// ADF description given in --fields.
+func MarkdownFromADF(value any) string { return markdownFromADF(value) }
+
 // markdownToADF is adfFromMarkdown with an untyped nil for empty input, which
 // marshals to null and clears the field.
 func markdownToADF(markdown string) any {

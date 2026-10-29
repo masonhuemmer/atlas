@@ -600,31 +600,69 @@ func applyFields(iss *domain.Issue, fields map[string]any, custom map[string]any
 			}
 			iss.Summary = s
 		case "description":
-			s, err := asString(v)
-			if err != nil {
-				return err
+			// REST takes an ADF document, a string, or null; the fake keeps Markdown.
+			switch t := v.(type) {
+			case nil:
+				iss.Description = ""
+			case map[string]any:
+				if t["type"] != "doc" {
+					return domain.Usage("description must be a string or an ADF document")
+				}
+				iss.Description = rest.MarkdownFromADF(t)
+			default:
+				s, err := asString(v)
+				if err != nil {
+					return err
+				}
+				iss.Description = s
 			}
-			iss.Description = s
 		case "priority":
-			s, err := asString(v)
-			if err != nil {
-				return err
+			// REST takes {"name": ...} or {"id": ...}; the fake keeps the name.
+			switch t := v.(type) {
+			case nil:
+				iss.Priority = ""
+			case map[string]any:
+				name, _ := t["name"].(string)
+				if strings.TrimSpace(name) == "" {
+					name, _ = t["id"].(string)
+				}
+				if strings.TrimSpace(name) == "" {
+					return domain.Usage("priority must have a name or id")
+				}
+				iss.Priority = strings.TrimSpace(name)
+			default:
+				s, err := asString(v)
+				if err != nil {
+					return err
+				}
+				iss.Priority = s
 			}
-			iss.Priority = s
 		case "labels":
+			if v == nil {
+				iss.Labels = nil
+				continue
+			}
 			labels, err := asStringSlice(v)
 			if err != nil {
 				return err
 			}
 			iss.Labels = labels
 		case "assignee":
-			if account, ok := v.(map[string]any); ok {
-				id, ok := account["accountId"].(string)
-				if !ok || strings.TrimSpace(id) == "" {
+			switch t := v.(type) {
+			case nil:
+				iss.Assignee = ""
+			case map[string]any:
+				id, present := t["accountId"]
+				if present && id == nil {
+					iss.Assignee = "" // {"accountId": null} unassigns
+					continue
+				}
+				accountID, ok := id.(string)
+				if !ok || strings.TrimSpace(accountID) == "" {
 					return domain.Usage("assignee must have an accountId")
 				}
-				iss.Assignee = strings.TrimSpace(id)
-			} else {
+				iss.Assignee = strings.TrimSpace(accountID)
+			default:
 				s, err := asString(v)
 				if err != nil {
 					return err
