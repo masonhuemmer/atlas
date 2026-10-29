@@ -26,6 +26,10 @@ func adfTextNode(text string) map[string]any {
 	return map[string]any{"type": "text", "text": text}
 }
 
+func adfDateNode(timestamp any) map[string]any {
+	return map[string]any{"type": "date", "attrs": map[string]any{"timestamp": timestamp}}
+}
+
 func TestFlattenFieldValue(t *testing.T) {
 	linked := map[string]any{"type": "text", "text": "docs", "marks": []any{
 		map[string]any{"type": "strong"},
@@ -79,6 +83,31 @@ func TestFlattenFieldValue(t *testing.T) {
 		}}), "one\ntwo"},
 		{"code block", adfDoc(map[string]any{"type": "codeBlock", "content": []any{adfTextNode("x := 1")}}), "x := 1"},
 		{"adf inside array", []any{adfDoc(adfPara(adfTextNode("x")))}, "x"},
+		// Inline nodes that carry their value in attrs: a field holding only one
+		// of them must not read as empty.
+		{"date only", adfDoc(adfPara(adfDateNode("1582152559000"))), "2020-02-19"},
+		{"date with a numeric timestamp", adfDoc(adfPara(adfDateNode(float64(1582152559000)))), "2020-02-19"},
+		{"date is rendered in UTC, last second of the day", adfDoc(adfPara(adfDateNode("1582156799000"))), "2020-02-19"},
+		{"date is rendered in UTC, first second of the next day", adfDoc(adfPara(adfDateNode("1582156800000"))), "2020-02-20"},
+		{"date inside text", adfDoc(adfPara(adfTextNode("Due "), adfDateNode("1582152559000"), adfTextNode(" please"))), "Due 2020-02-19 please"},
+		{"dates across blocks", adfDoc(adfPara(adfDateNode("1582152559000")), adfPara(adfTextNode("then "), adfDateNode("1582243200000"))), "2020-02-19\nthen 2020-02-21"},
+		{"date with an unparseable timestamp keeps it", adfDoc(adfPara(adfDateNode("soon"))), "soon"},
+		{"date without a timestamp is empty", adfDoc(adfPara(map[string]any{"type": "date", "attrs": map[string]any{}})), ""},
+		{"status only", adfDoc(adfPara(map[string]any{"type": "status", "attrs": map[string]any{"text": "IN PROGRESS", "color": "blue"}})), "IN PROGRESS"},
+		{"emoji only with text", adfDoc(adfPara(map[string]any{"type": "emoji", "attrs": map[string]any{"shortName": ":smile:", "text": "😄"}})), "😄"},
+		{"emoji only with shortName", adfDoc(adfPara(map[string]any{"type": "emoji", "attrs": map[string]any{"shortName": ":thumbsup:"}})), ":thumbsup:"},
+		{"mention only", adfDoc(adfPara(map[string]any{"type": "mention", "attrs": map[string]any{"id": "a1", "text": "@Ada Lovelace"}})), "@Ada Lovelace"},
+		{"inlineCard only with url", adfDoc(adfPara(map[string]any{"type": "inlineCard", "attrs": map[string]any{"url": "https://example.com/c"}})), "https://example.com/c"},
+		{"inlineCard only with data", adfDoc(adfPara(map[string]any{"type": "inlineCard", "attrs": map[string]any{"data": map[string]any{"@type": "Document", "name": "Spec", "url": "https://example.com/spec"}}})), "https://example.com/spec"},
+		{"placeholder only", adfDoc(adfPara(map[string]any{"type": "placeholder", "attrs": map[string]any{"text": "Type a name"}})), "Type a name"},
+		{"all attr-valued nodes together", adfDoc(adfPara(
+			map[string]any{"type": "status", "attrs": map[string]any{"text": "DONE"}}, adfTextNode(" "),
+			adfDateNode("1582152559000"), adfTextNode(" "),
+			map[string]any{"type": "mention", "attrs": map[string]any{"text": "@Ada"}}, adfTextNode(" "),
+			map[string]any{"type": "emoji", "attrs": map[string]any{"text": "👍"}}, adfTextNode(" "),
+			map[string]any{"type": "inlineCard", "attrs": map[string]any{"url": "https://example.com/c"}}, adfTextNode(" "),
+			map[string]any{"type": "placeholder", "attrs": map[string]any{"text": "?"}})),
+			"DONE 2020-02-19 @Ada 👍 https://example.com/c ?"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -86,6 +115,25 @@ func TestFlattenFieldValue(t *testing.T) {
 				t.Fatalf("flattenField(%v) = %q, want %q", tc.in, got, tc.want)
 			}
 		})
+	}
+}
+
+// A textarea holding only attrs-valued nodes is not empty.
+func TestBuildCustomFieldsKeepsAttrOnlyDocuments(t *testing.T) {
+	values := map[string]any{
+		"customfield_1": adfDoc(adfPara(adfDateNode("1582152559000"))),
+		"customfield_2": adfDoc(adfPara(map[string]any{"type": "status", "attrs": map[string]any{"text": "DONE"}})),
+		"customfield_3": adfDoc(adfPara(map[string]any{"type": "placeholder", "attrs": map[string]any{"text": "fill me"}})),
+		"customfield_4": adfDoc(adfPara()),
+	}
+	got := BuildCustomFields(values, nil, nil, true)
+	var texts []string
+	for _, f := range got {
+		texts = append(texts, f.ID+"="+f.Text)
+	}
+	want := "customfield_1=2020-02-19,customfield_2=DONE,customfield_3=fill me"
+	if strings.Join(texts, ",") != want {
+		t.Fatalf("got %v, want %s", texts, want)
 	}
 }
 

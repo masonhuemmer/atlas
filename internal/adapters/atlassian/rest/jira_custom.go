@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/masonhuemmer/atlas/internal/app/auth"
 	"github.com/masonhuemmer/atlas/internal/domain"
@@ -283,14 +284,21 @@ func adfPlain(node map[string]any) string {
 		return adfLinkedText(node)
 	case "hardBreak":
 		return "\n"
-	case "mention", "emoji", "status":
+	case "mention", "emoji", "status", "placeholder":
 		attrs := asMap(node["attrs"])
 		if text := str(attrs, "text"); text != "" {
 			return text
 		}
 		return str(attrs, "shortName")
+	case "date":
+		return adfDateText(asMap(node["attrs"])["timestamp"])
 	case "inlineCard", "blockCard", "embedCard":
-		return str(asMap(node["attrs"]), "url")
+		attrs := asMap(node["attrs"])
+		if url := str(attrs, "url"); url != "" {
+			return url
+		}
+		// A smart link may carry its JSON-LD in attrs.data instead of a url.
+		return str(asMap(attrs["data"]), "url")
 	}
 	var lines []string
 	var inline strings.Builder
@@ -313,6 +321,23 @@ func adfPlain(node map[string]any) string {
 	}
 	flush()
 	return strings.Join(lines, "\n")
+}
+
+// adfDateText renders a date node's attrs.timestamp, epoch milliseconds as a
+// string or a number, as a UTC YYYY-MM-DD date. A value that is not a
+// timestamp is kept as given rather than dropped.
+func adfDateText(timestamp any) string {
+	switch t := timestamp.(type) {
+	case string:
+		ms, err := strconv.ParseInt(strings.TrimSpace(t), 10, 64)
+		if err != nil {
+			return t
+		}
+		return time.UnixMilli(ms).UTC().Format("2006-01-02")
+	case float64:
+		return time.UnixMilli(int64(t)).UTC().Format("2006-01-02")
+	}
+	return ""
 }
 
 // adfLinkedText keeps a link mark as "text <href>"; text that is already the
