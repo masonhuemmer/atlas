@@ -112,18 +112,29 @@ func (c *Client) workspaceCred(workspace string) (auth.Cred, error) {
 	return auth.WorkspaceCred(c.Store, workspace)
 }
 
+// maxJSONBody caps what doJSON reads from a response.
+const maxJSONBody = 1 << 20
+
 func (c *Client) doJSON(ctx context.Context, method, rawURL string, cred auth.Cred, extra http.Header, body any) (int, []byte, error) {
+	code, b, _, err := c.doJSONLimit(ctx, method, rawURL, cred, extra, body, maxJSONBody)
+	return code, b, err
+}
+
+// doJSONLimit is doJSON with a caller-chosen cap. complete is false when the
+// body was longer than limit or the connection broke while reading it, so a
+// caller that must not act on a partial body can refuse it.
+func (c *Client) doJSONLimit(ctx context.Context, method, rawURL string, cred auth.Cred, extra http.Header, body any, limit int64) (code int, b []byte, complete bool, err error) {
 	var rdr io.Reader
 	if body != nil {
 		b, err := json.Marshal(body)
 		if err != nil {
-			return 0, nil, domain.Usage(err.Error())
+			return 0, nil, false, domain.Usage(err.Error())
 		}
 		rdr = bytes.NewReader(b)
 	}
 	req, err := http.NewRequestWithContext(ctx, method, rawURL, rdr)
 	if err != nil {
-		return 0, nil, domain.Usage(err.Error())
+		return 0, nil, false, domain.Usage(err.Error())
 	}
 	req.SetBasicAuth(cred.Email, cred.Token)
 	req.Header.Set("Accept", "application/json")
@@ -137,11 +148,15 @@ func (c *Client) doJSON(ctx context.Context, method, rawURL string, cred auth.Cr
 	}
 	res, err := c.httpc().Do(req)
 	if err != nil {
-		return 0, nil, domain.Service(err.Error())
+		return 0, nil, false, domain.Service(err.Error())
 	}
 	defer res.Body.Close()
-	b, _ := io.ReadAll(io.LimitReader(res.Body, 1<<20))
-	return res.StatusCode, b, nil
+	b, readErr := io.ReadAll(io.LimitReader(res.Body, limit+1))
+	complete = readErr == nil && int64(len(b)) <= limit
+	if int64(len(b)) > limit {
+		b = b[:limit]
+	}
+	return res.StatusCode, b, complete, nil
 }
 
 func (c *Client) doBytes(ctx context.Context, method, rawURL string, cred auth.Cred, extra http.Header) (int, []byte, error) {

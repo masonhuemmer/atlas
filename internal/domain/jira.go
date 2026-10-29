@@ -65,6 +65,31 @@ type Issue struct {
 	Links       []IssueLink `json:"links,omitempty"`
 }
 
+// CustomField is one non-empty custom field of an issue. Type is the last
+// segment of the field's schema.custom (textarea, userpicker, ...) or the
+// schema type. Text is the field value flattened to plain text.
+type CustomField struct {
+	ID   string `json:"id,omitempty"`
+	Name string `json:"name,omitempty"`
+	Type string `json:"type,omitempty"`
+	Text string `json:"text,omitempty"`
+}
+
+// StatusChange is one status transition from the issue changelog.
+type StatusChange struct {
+	Created string `json:"created,omitempty"`
+	Author  string `json:"author,omitempty"`
+	From    string `json:"from,omitempty"`
+	To      string `json:"to,omitempty"`
+}
+
+// IssueCustom is what jira get --fields adds to an issue: custom fields and
+// status history. Both stay empty when the issue has none.
+type IssueCustom struct {
+	CustomFields  []CustomField  `json:"custom_fields,omitempty"`
+	StatusHistory []StatusChange `json:"status_history,omitempty"`
+}
+
 // SearchResult is one-site JQL output. Items use the default search fields.
 type SearchResult struct {
 	JQL           string  `json:"jql"`
@@ -98,6 +123,8 @@ type CreateIssue struct {
 	Description string
 	Labels      []string
 	Assignee    string
+	// Fields are extra REST fields from --fields, merged into the payload.
+	Fields map[string]any
 }
 
 func BrowseURL(hostname, key string) string {

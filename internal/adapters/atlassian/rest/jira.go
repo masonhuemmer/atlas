@@ -318,22 +318,9 @@ func (j Jira) Create(ctx context.Context, hostname string, in domain.CreateIssue
 	if err != nil {
 		return domain.Issue{}, err
 	}
-	fields := map[string]any{
-		"project":   map[string]any{"key": in.Project},
-		"issuetype": map[string]any{"name": in.IssueType},
-		"summary":   in.Summary,
-	}
-	if in.Parent != "" {
-		fields["parent"] = map[string]any{"key": in.Parent}
-	}
-	if in.Description != "" {
-		fields["description"] = adfFromMarkdown(in.Description)
-	}
-	if len(in.Labels) > 0 {
-		fields["labels"] = in.Labels
-	}
-	if in.Assignee != "" {
-		fields["assignee"] = map[string]any{"accountId": in.Assignee}
+	fields, err := CreateFields(in, j.fieldCatalog(ctx, hostname))
+	if err != nil {
+		return domain.Issue{}, err
 	}
 	u := joinURL(j.origin(hostname), "/rest/api/3/issue")
 	code, body, err := j.doJSON(ctx, http.MethodPost, u, cred, nil, map[string]any{"fields": fields})
@@ -341,7 +328,7 @@ func (j Jira) Create(ctx context.Context, hostname string, in domain.CreateIssue
 		return domain.Issue{}, err
 	}
 	if code != http.StatusCreated && code != http.StatusOK {
-		return domain.Issue{}, MapStatus(code)
+		return domain.Issue{}, jiraWriteError(code, body)
 	}
 	key := str(mustJSON(body), "key")
 	if key == "" {
@@ -357,6 +344,13 @@ func (j Jira) Create(ctx context.Context, hostname string, in domain.CreateIssue
 	return created, nil
 }
 
+// CreateFields returns the `fields` object Create would send, without
+// sending it. It reads GET /rest/api/3/field only when a customfield_* string
+// needs its schema, and never writes.
+func (j Jira) CreateFields(ctx context.Context, hostname string, in domain.CreateIssue) (map[string]any, error) {
+	return CreateFields(in, j.fieldCatalog(ctx, hostname))
+}
+
 func (j Jira) Edit(ctx context.Context, hostname, key string, fields map[string]any, dryRun bool) (domain.Issue, error) {
 	if dryRun {
 		iss, err := j.Get(ctx, hostname, key)
@@ -365,25 +359,21 @@ func (j Jira) Edit(ctx context.Context, hostname, key string, fields map[string]
 		}
 		return iss, nil
 	}
-	if description, ok := fields["description"].(string); ok {
-		converted := make(map[string]any, len(fields))
-		for name, value := range fields {
-			converted[name] = value
-		}
-		converted["description"] = adfFromMarkdown(description)
-		fields = converted
+	fields, err := prepareWriteFields(fields, j.fieldCatalog(ctx, hostname))
+	if err != nil {
+		return domain.Issue{}, err
 	}
 	cred, err := j.credForHost(hostname)
 	if err != nil {
 		return domain.Issue{}, err
 	}
 	u := joinURL(j.origin(hostname), "/rest/api/3/issue/"+q(strings.ToUpper(strings.TrimSpace(key))))
-	code, _, err := j.doJSON(ctx, http.MethodPut, u, cred, nil, map[string]any{"fields": fields})
+	code, body, err := j.doJSON(ctx, http.MethodPut, u, cred, nil, map[string]any{"fields": fields})
 	if err != nil {
 		return domain.Issue{}, err
 	}
 	if code != http.StatusNoContent && code != http.StatusOK {
-		return domain.Issue{}, MapStatus(code)
+		return domain.Issue{}, jiraWriteError(code, body)
 	}
 	edited, err := j.Get(ctx, hostname, key)
 	if err != nil {

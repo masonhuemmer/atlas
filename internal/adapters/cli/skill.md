@@ -55,6 +55,7 @@ keys map to an alias. JQL/CQL that names two sites is usage. A
 | Status | `atlas_status` |
 | Help / recipe | `atlas_help` `topic=jira-search` (or namespace/verb) |
 | Get issue | `atlas_read` `namespace=jira` `verb=get` `args=["KEY-1"]` |
+| Get custom fields / status history | `atlas_read` `namespace=jira` `verb=get` `args=["KEY-1"]` `flags={fields:"custom,history"}`; `custom` is every non-empty custom field, `customfield_NNNNN` one field, `history` the status transitions. Output gains `custom_fields` `[{id,name,type,text}]` and `status_history` `[{created,author,from,to}]`; empty fields and an empty history are left out |
 | Find comment IDs | `atlas_read` `namespace=jira` `verb=comments` `args=["KEY-1"]`; follow `next_start_at` with `flags={start-at:N}` if needed |
 | Edit a comment | `atlas_write` `namespace=jira` `verb=comment` `args=["edit","KEY-1"]` `flags={id:"ID",body:"replacement"}` + `write_opt_in` |
 | Rich comment edit blocked | If `unsupported_content` appears in `jira comments`, edit that comment in Jira; Atlas rejects a Markdown replacement that would discard the rich node |
@@ -66,6 +67,7 @@ keys map to an alias. JQL/CQL that names two sites is usage. A
 | Find exact Jira board column | Follow **Board placement** below |
 | Find and assign a Jira user | Follow **Assign a Jira issue** below |
 | Create issue | `atlas_write` `namespace=jira` `verb=create` `flags={project,type,summary}` + `write_opt_in` |
+| Create issue with custom fields | `atlas_write` `namespace=jira` `verb=create` `flags={project,type,summary,fields:"{\"customfield_10538\":\"text\"}"}` + `write_opt_in`; see **Custom fields** below |
 | Create sub-task under story | `atlas_write` `namespace=jira` `verb=create` `flags={project,type:"Sub-task",summary,parent:"KEY-1"}` + `write_opt_in` |
 | Reparent sub-task | `atlas_write` `namespace=jira` `verb=edit` `args=["KEY-2"]` `flags={parent:"KEY-1"}` + `write_opt_in` |
 | Link issues without changing parent | `atlas_write` `namespace=jira` `verb=link` `args=["KEY-1","KEY-2"]` + `write_opt_in` |
@@ -92,6 +94,12 @@ keys map to an alias. JQL/CQL that names two sites is usage. A
 When creating an issue, pass Markdown in the `description` flag. When editing one, pass a Markdown string as `description` inside the `fields` JSON object. Atlas converts those strings to Jira rich text on write. Read the issue with `jira get` afterward to check the stored description.
 
 After `jira comment`, read the issue with `jira get KEY-1 --fields comment` and check `comments` for the exact text. After `pr comment`, read `pr comments --repo SLUG --id N` and follow `next_page` if needed. After `pr approve`, read `pr get --repo SLUG --id N` and check the approving participant against the author.
+
+## Custom fields
+
+`fields` is a JSON object passed as a **JSON string** (`fields:"{\"customfield_10538\":\"text\"}"`): flags carry only strings, booleans, numbers and string lists, so an object value is a `usage` error. It works on `jira create` and `jira edit`. On create it is merged into the new issue; `project`, `issuetype` and `summary` are usage errors there, and `description`, `parent`, `labels` and `assignee` clash with the flag of the same name.
+
+A string for a `textarea` custom field is Markdown and is converted to Jira rich text, because Jira REST v3 rejects a plain string for it. Strings for other field types, and objects and lists, are sent as given. Without `write_opt_in`, create returns a dry-run that echoes the merged payload as `fields`. When Jira rejects a write with a 400, the message carries Jira's field errors. Read the result back with `jira get` `flags={fields:"custom,history"}` (see the workloads table).
 
 ## Board placement
 

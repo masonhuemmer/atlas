@@ -10,6 +10,9 @@ import (
 // Store is licensed Jira on one hostname. Fake memory and live REST both implement it.
 type Store interface {
 	Get(ctx context.Context, hostname, key string) (domain.Issue, error)
+	// GetCustom reads what Get leaves out: ids and all select custom fields,
+	// history adds the status transitions from the changelog.
+	GetCustom(ctx context.Context, hostname, key string, ids []string, all, history bool) (domain.IssueCustom, error)
 	Attachments(ctx context.Context, hostname, key string) ([]domain.JiraAttachment, error)
 	DownloadAttachment(ctx context.Context, hostname, id string, dst io.Writer) (int64, error)
 	Search(ctx context.Context, hostname, jql string) (domain.SearchResult, error)
@@ -20,6 +23,9 @@ type Store interface {
 	Placement(ctx context.Context, hostname, key string, boardID int) (domain.BoardPlacement, error)
 	Transitions(ctx context.Context, hostname, key string, boardID int) (domain.JiraTransitions, error)
 	Create(ctx context.Context, hostname string, in domain.CreateIssue, dryRun bool) (domain.Issue, error)
+	// CreateFields returns the `fields` object Create would send. It may read
+	// the site's field schema, and never writes.
+	CreateFields(ctx context.Context, hostname string, in domain.CreateIssue) (map[string]any, error)
 	Edit(ctx context.Context, hostname, key string, fields map[string]any, dryRun bool) (domain.Issue, error)
 	Comment(ctx context.Context, hostname, key, body string, dryRun bool) error
 	CommentInternal(ctx context.Context, hostname, key, body string, dryRun bool) error

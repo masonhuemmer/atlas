@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/masonhuemmer/atlas/internal/adapters/atlassian/rest"
 	"github.com/masonhuemmer/atlas/internal/domain"
 )
 
@@ -38,6 +39,9 @@ type Memory struct {
 	lastComment    domain.Comment
 	lastCreate     map[string]any
 	searchCalls    int
+	customMeta     map[string]rest.FieldMeta
+	custom         map[string]map[string]any
+	history        map[string][]domain.StatusChange
 }
 
 // JiraAPI is the in-process adapter used by ATLAS_FAKE and tests.
@@ -50,6 +54,13 @@ func (j JiraAPI) Get(ctx context.Context, hostname, key string) (domain.Issue, e
 		return domain.Issue{}, domain.Service("jira memory not configured")
 	}
 	return j.Memory.Get(ctx, hostname, key)
+}
+
+func (j JiraAPI) GetCustom(ctx context.Context, hostname, key string, ids []string, all, history bool) (domain.IssueCustom, error) {
+	if j.Memory == nil {
+		return domain.IssueCustom{}, domain.Service("jira memory not configured")
+	}
+	return j.Memory.GetCustom(ctx, hostname, key, ids, all, history)
 }
 
 func (j JiraAPI) Attachments(ctx context.Context, hostname, key string) ([]domain.JiraAttachment, error) {
@@ -96,6 +107,13 @@ func (j JiraAPI) Create(ctx context.Context, hostname string, in domain.CreateIs
 		return domain.Issue{}, domain.Service("jira memory not configured")
 	}
 	return j.Memory.Create(ctx, hostname, in, dryRun)
+}
+
+func (j JiraAPI) CreateFields(ctx context.Context, hostname string, in domain.CreateIssue) (map[string]any, error) {
+	if j.Memory == nil {
+		return nil, domain.Service("jira memory not configured")
+	}
+	return j.Memory.CreateFields(ctx, hostname, in)
 }
 
 func (j JiraAPI) Edit(ctx context.Context, hostname, key string, fields map[string]any, dryRun bool) (domain.Issue, error) {
@@ -181,6 +199,33 @@ func (m *Memory) Get(_ context.Context, hostname, key string) (domain.Issue, err
 		return domain.Issue{}, domain.NotFound("issue not found").WithHint("check the key and site")
 	}
 	return cloneIssue(iss), nil
+}
+
+// GetCustom serves the seeded custom fields and status history. Field
+// selection and text flattening are the live adapter's own code.
+func (m *Memory) GetCustom(_ context.Context, hostname, key string, ids []string, all, history bool) (domain.IssueCustom, error) {
+	if m == nil {
+		return domain.IssueCustom{}, domain.Service("jira memory not configured")
+	}
+	hostname = strings.TrimSpace(hostname)
+	key = strings.ToUpper(strings.TrimSpace(key))
+	if hostname == "" || key == "" {
+		return domain.IssueCustom{}, domain.Usage("hostname and issue key are required")
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	lookup := memKey(hostname, key)
+	if _, ok := m.issues[lookup]; !ok {
+		return domain.IssueCustom{}, domain.NotFound("issue not found").WithHint("check the key and site")
+	}
+	var out domain.IssueCustom
+	if all || len(ids) > 0 {
+		out.CustomFields = rest.BuildCustomFields(m.custom[lookup], m.customMeta, ids, all)
+	}
+	if history {
+		out.StatusHistory = append([]domain.StatusChange(nil), m.history[lookup]...)
+	}
+	return out, nil
 }
 
 func (m *Memory) Search(_ context.Context, hostname, jql string) (domain.SearchResult, error) {
@@ -308,6 +353,16 @@ func (m *Memory) Create(_ context.Context, hostname string, in domain.CreateIssu
 		Reporter:    domain.DefaultAssigneeAccountID(),
 		Project:     project,
 	}
+	custom := map[string]any{}
+	if len(in.Fields) > 0 {
+		fields, err := rest.ConvertCustomFields(in.Fields, m.catalog)
+		if err != nil {
+			return domain.Issue{}, err
+		}
+		if err := applyFields(&preview, fields, custom); err != nil {
+			return domain.Issue{}, err
+		}
+	}
 	if dryRun {
 		return preview, nil
 	}
@@ -321,9 +376,24 @@ func (m *Memory) Create(_ context.Context, hostname string, in domain.CreateIssu
 	preview.BrowseURL = domain.BrowseURL(hostname, preview.Key)
 	m.next[project] = n + 1
 	m.putLocked(preview)
+	if len(custom) > 0 {
+		m.custom[memKey(hostname, preview.Key)] = custom
+	}
 	m.transitions[memKey(hostname, preview.Key)] = defaultTransitions(project, issuetype)
 	return cloneIssue(preview), nil
 }
+
+// CreateFields returns the payload Create would send, built by the live
+// adapter's own code against the seeded field schema.
+func (m *Memory) CreateFields(_ context.Context, _ string, in domain.CreateIssue) (map[string]any, error) {
+	if m == nil {
+		return nil, domain.Service("jira memory not configured")
+	}
+	return rest.CreateFields(in, m.catalog)
+}
+
+// catalog is the seeded custom field schema.
+func (m *Memory) catalog() (map[string]rest.FieldMeta, error) { return m.customMeta, nil }
 
 func (m *Memory) Edit(_ context.Context, hostname, key string, fields map[string]any, dryRun bool) (domain.Issue, error) {
 	if m == nil {
@@ -340,14 +410,23 @@ func (m *Memory) Edit(_ context.Context, hostname, key string, fields map[string
 	if !ok {
 		return domain.Issue{}, domain.NotFound("issue not found").WithHint("check the key and site")
 	}
+	fields, err := rest.ConvertCustomFields(fields, m.catalog)
+	if err != nil {
+		return domain.Issue{}, err
+	}
 	next := cloneIssue(iss)
-	if err := applyFields(&next, fields); err != nil {
+	nextCustom := make(map[string]any, len(m.custom[memKey(hostname, key)]))
+	for id, value := range m.custom[memKey(hostname, key)] {
+		nextCustom[id] = value
+	}
+	if err := applyFields(&next, fields, nextCustom); err != nil {
 		return domain.Issue{}, err
 	}
 	if dryRun {
 		return next, nil
 	}
 	m.putLocked(next)
+	m.custom[memKey(hostname, key)] = nextCustom
 	return cloneIssue(next), nil
 }
 
@@ -506,7 +585,9 @@ func (m *Memory) putPageLocked(p domain.Page) {
 	m.pages[memKey(p.Site, p.ID)] = p
 }
 
-func applyFields(iss *domain.Issue, fields map[string]any) error {
+// applyFields sets the fields the fake models on iss. customfield_* values
+// are stored in custom, keyed by id, as Jira would return them.
+func applyFields(iss *domain.Issue, fields map[string]any, custom map[string]any) error {
 	if len(fields) == 0 {
 		return domain.Usage("edit requires --fields JSON")
 	}
@@ -519,31 +600,69 @@ func applyFields(iss *domain.Issue, fields map[string]any) error {
 			}
 			iss.Summary = s
 		case "description":
-			s, err := asString(v)
-			if err != nil {
-				return err
+			// REST takes an ADF document, a string, or null; the fake keeps Markdown.
+			switch t := v.(type) {
+			case nil:
+				iss.Description = ""
+			case map[string]any:
+				if t["type"] != "doc" {
+					return domain.Usage("description must be a string or an ADF document")
+				}
+				iss.Description = rest.MarkdownFromADF(t)
+			default:
+				s, err := asString(v)
+				if err != nil {
+					return err
+				}
+				iss.Description = s
 			}
-			iss.Description = s
 		case "priority":
-			s, err := asString(v)
-			if err != nil {
-				return err
+			// REST takes {"name": ...} or {"id": ...}; the fake keeps the name.
+			switch t := v.(type) {
+			case nil:
+				iss.Priority = ""
+			case map[string]any:
+				name, _ := t["name"].(string)
+				if strings.TrimSpace(name) == "" {
+					name, _ = t["id"].(string)
+				}
+				if strings.TrimSpace(name) == "" {
+					return domain.Usage("priority must have a name or id")
+				}
+				iss.Priority = strings.TrimSpace(name)
+			default:
+				s, err := asString(v)
+				if err != nil {
+					return err
+				}
+				iss.Priority = s
 			}
-			iss.Priority = s
 		case "labels":
+			if v == nil {
+				iss.Labels = nil
+				continue
+			}
 			labels, err := asStringSlice(v)
 			if err != nil {
 				return err
 			}
 			iss.Labels = labels
 		case "assignee":
-			if account, ok := v.(map[string]any); ok {
-				id, ok := account["accountId"].(string)
-				if !ok || strings.TrimSpace(id) == "" {
+			switch t := v.(type) {
+			case nil:
+				iss.Assignee = ""
+			case map[string]any:
+				id, present := t["accountId"]
+				if present && id == nil {
+					iss.Assignee = "" // {"accountId": null} unassigns
+					continue
+				}
+				accountID, ok := id.(string)
+				if !ok || strings.TrimSpace(accountID) == "" {
 					return domain.Usage("assignee must have an accountId")
 				}
-				iss.Assignee = strings.TrimSpace(id)
-			} else {
+				iss.Assignee = strings.TrimSpace(accountID)
+			default:
 				s, err := asString(v)
 				if err != nil {
 					return err
@@ -563,7 +682,11 @@ func applyFields(iss *domain.Issue, fields map[string]any) error {
 		case "status", "issuetype", "project", "key":
 			return domain.Usagef("cannot edit %s via --fields", k)
 		default:
-			return domain.Usagef("unknown field %q", k)
+			id := strings.ToLower(strings.TrimSpace(k))
+			if !rest.IsCustomFieldID(id) {
+				return domain.Usagef("unknown field %q", k)
+			}
+			custom[id] = v
 		}
 	}
 	return nil
