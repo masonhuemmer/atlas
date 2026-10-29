@@ -23,6 +23,9 @@ type Store interface {
 	Placement(ctx context.Context, hostname, key string, boardID int) (domain.BoardPlacement, error)
 	Transitions(ctx context.Context, hostname, key string, boardID int) (domain.JiraTransitions, error)
 	Create(ctx context.Context, hostname string, in domain.CreateIssue, dryRun bool) (domain.Issue, error)
+	// CreateFields returns the `fields` object Create would send. It may read
+	// the site's field schema, and never writes.
+	CreateFields(ctx context.Context, hostname string, in domain.CreateIssue) (map[string]any, error)
 	Edit(ctx context.Context, hostname, key string, fields map[string]any, dryRun bool) (domain.Issue, error)
 	Comment(ctx context.Context, hostname, key, body string, dryRun bool) error
 	CommentInternal(ctx context.Context, hostname, key, body string, dryRun bool) error

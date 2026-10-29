@@ -72,7 +72,13 @@ placement:  atlas jira board placement KEY-1 --board 123 [--site ALIAS]
 transitions: atlas jira transitions KEY-1 [--board 123]
 create:     atlas jira create --project KEY --type Task --summary '...'
 create sub-task: atlas jira create --project KEY --type Sub-task --summary '...' --parent KEY-1
-edit:       atlas jira edit SUBTASK-2 --parent KEY-1  (or --fields '{...}')
+create fields: atlas jira create --project KEY --type Task --summary '...' --fields '{"customfield_10538":"line one\n\nline two"}' [--dry-run]
+            --fields is a JSON object of REST fields merged into the new issue. project, issuetype and summary
+            are usage errors there, and description, parent, labels and assignee clash with their flags.
+            A string for a textarea custom field is converted from Markdown to rich text, as is a description.
+            --dry-run echoes the merged payload as fields; it may read GET /field once and never writes.
+            A 400 from Jira reports its field errors; the exit class stays service.
+edit:       atlas jira edit SUBTASK-2 --parent KEY-1  (or --fields '{...}', converted the same way)
 assign:     atlas jira edit KEY-1 --assignee ACCOUNT_ID
 comment:    atlas jira comment KEY-1 --body '...' [--internal]
 edit comment: atlas jira comment edit KEY-1 --id ID --body '...' [--dry-run]

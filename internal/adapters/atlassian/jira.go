@@ -109,6 +109,13 @@ func (j JiraAPI) Create(ctx context.Context, hostname string, in domain.CreateIs
 	return j.Memory.Create(ctx, hostname, in, dryRun)
 }
 
+func (j JiraAPI) CreateFields(ctx context.Context, hostname string, in domain.CreateIssue) (map[string]any, error) {
+	if j.Memory == nil {
+		return nil, domain.Service("jira memory not configured")
+	}
+	return j.Memory.CreateFields(ctx, hostname, in)
+}
+
 func (j JiraAPI) Edit(ctx context.Context, hostname, key string, fields map[string]any, dryRun bool) (domain.Issue, error) {
 	if j.Memory == nil {
 		return domain.Issue{}, domain.Service("jira memory not configured")
@@ -346,6 +353,16 @@ func (m *Memory) Create(_ context.Context, hostname string, in domain.CreateIssu
 		Reporter:    domain.DefaultAssigneeAccountID(),
 		Project:     project,
 	}
+	custom := map[string]any{}
+	if len(in.Fields) > 0 {
+		fields, err := rest.ConvertCustomFields(in.Fields, m.catalog)
+		if err != nil {
+			return domain.Issue{}, err
+		}
+		if err := applyFields(&preview, fields, custom); err != nil {
+			return domain.Issue{}, err
+		}
+	}
 	if dryRun {
 		return preview, nil
 	}
@@ -359,9 +376,24 @@ func (m *Memory) Create(_ context.Context, hostname string, in domain.CreateIssu
 	preview.BrowseURL = domain.BrowseURL(hostname, preview.Key)
 	m.next[project] = n + 1
 	m.putLocked(preview)
+	if len(custom) > 0 {
+		m.custom[memKey(hostname, preview.Key)] = custom
+	}
 	m.transitions[memKey(hostname, preview.Key)] = defaultTransitions(project, issuetype)
 	return cloneIssue(preview), nil
 }
+
+// CreateFields returns the payload Create would send, built by the live
+// adapter's own code against the seeded field schema.
+func (m *Memory) CreateFields(_ context.Context, _ string, in domain.CreateIssue) (map[string]any, error) {
+	if m == nil {
+		return nil, domain.Service("jira memory not configured")
+	}
+	return rest.CreateFields(in, m.catalog)
+}
+
+// catalog is the seeded custom field schema.
+func (m *Memory) catalog() (map[string]rest.FieldMeta, error) { return m.customMeta, nil }
 
 func (m *Memory) Edit(_ context.Context, hostname, key string, fields map[string]any, dryRun bool) (domain.Issue, error) {
 	if m == nil {
@@ -378,14 +410,23 @@ func (m *Memory) Edit(_ context.Context, hostname, key string, fields map[string
 	if !ok {
 		return domain.Issue{}, domain.NotFound("issue not found").WithHint("check the key and site")
 	}
+	fields, err := rest.ConvertCustomFields(fields, m.catalog)
+	if err != nil {
+		return domain.Issue{}, err
+	}
 	next := cloneIssue(iss)
-	if err := applyFields(&next, fields); err != nil {
+	nextCustom := make(map[string]any, len(m.custom[memKey(hostname, key)]))
+	for id, value := range m.custom[memKey(hostname, key)] {
+		nextCustom[id] = value
+	}
+	if err := applyFields(&next, fields, nextCustom); err != nil {
 		return domain.Issue{}, err
 	}
 	if dryRun {
 		return next, nil
 	}
 	m.putLocked(next)
+	m.custom[memKey(hostname, key)] = nextCustom
 	return cloneIssue(next), nil
 }
 
@@ -544,7 +585,9 @@ func (m *Memory) putPageLocked(p domain.Page) {
 	m.pages[memKey(p.Site, p.ID)] = p
 }
 
-func applyFields(iss *domain.Issue, fields map[string]any) error {
+// applyFields sets the fields the fake models on iss. customfield_* values
+// are stored in custom, keyed by id, as Jira would return them.
+func applyFields(iss *domain.Issue, fields map[string]any, custom map[string]any) error {
 	if len(fields) == 0 {
 		return domain.Usage("edit requires --fields JSON")
 	}
@@ -601,7 +644,11 @@ func applyFields(iss *domain.Issue, fields map[string]any) error {
 		case "status", "issuetype", "project", "key":
 			return domain.Usagef("cannot edit %s via --fields", k)
 		default:
-			return domain.Usagef("unknown field %q", k)
+			id := strings.ToLower(strings.TrimSpace(k))
+			if !rest.IsCustomFieldID(id) {
+				return domain.Usagef("unknown field %q", k)
+			}
+			custom[id] = v
 		}
 	}
 	return nil

@@ -281,6 +281,7 @@ func jiraCreate(args []string, d Deps, format string) int {
 	summary := fsset.String("summary", "", "summary")
 	description := fsset.String("description", "", "markdown description")
 	assignee := fsset.String("assignee", "", "assignee.accountId")
+	fieldsJSON := fsset.String("fields", "", "JSON object of extra REST fields, merged into the issue")
 	dry := fsset.Bool("dry-run", false, "")
 	var labels []string
 	fsset.Func("labels", "labels (repeatable or comma-separated)", func(s string) error {
@@ -297,6 +298,23 @@ func jiraCreate(args []string, d Deps, format string) int {
 	}
 	if strings.TrimSpace(*project) == "" || strings.TrimSpace(*issuetype) == "" || strings.TrimSpace(*summary) == "" {
 		return fail(d, domain.Usage("create requires --project, --type, and --summary").WithHint("atlas jira create --project KEY --type Task --summary '…'"))
+	}
+	var extra map[string]any
+	haveFields := strings.TrimSpace(*fieldsJSON) != ""
+	if haveFields {
+		var err error
+		extra, err = parseFieldsJSON(*fieldsJSON, createFieldsExample)
+		if err != nil {
+			return fail(d, err)
+		}
+		if err := checkCreateFields(extra, map[string]bool{
+			"description": *description != "",
+			"parent":      strings.TrimSpace(*parent) != "",
+			"labels":      len(labels) > 0,
+			"assignee":    strings.TrimSpace(*assignee) != "",
+		}); err != nil {
+			return fail(d, err)
+		}
 	}
 	site, err := domain.Resolve(domain.ResolveInput{Site: *siteFlag, Project: *project})
 	if err != nil {
@@ -320,8 +338,9 @@ func jiraCreate(args []string, d Deps, format string) int {
 		Description: *description,
 		Labels:      labels,
 		Assignee:    strings.TrimSpace(*assignee),
+		Fields:      extra,
 	}
-	if in.Assignee == "" {
+	if in.Assignee == "" && !hasField(extra, "assignee") {
 		in.Assignee = domain.DefaultAssigneeAccountID()
 	}
 	iss, err := d.Jira.Create(ctx(), site.Hostname, in, *dry)
@@ -329,7 +348,7 @@ func jiraCreate(args []string, d Deps, format string) int {
 		return fail(d, err)
 	}
 	if *dry {
-		return success(d, format, jiraDryRun{
+		preview := jiraDryRun{
 			DryRun:    true,
 			Namespace: "jira",
 			Verb:      "create",
@@ -337,7 +356,15 @@ func jiraCreate(args []string, d Deps, format string) int {
 			Parent:    in.Parent,
 			Assignee:  in.Assignee,
 			Summary:   in.Summary,
-		})
+		}
+		if haveFields {
+			// The preview shows the payload as it will be sent. This may read
+			// the site's field schema once; it never writes.
+			if preview.Fields, err = d.Jira.CreateFields(ctx(), site.Hostname, in); err != nil {
+				return fail(d, err)
+			}
+		}
+		return success(d, format, preview)
 	}
 	return success(d, format, iss)
 }
@@ -372,7 +399,7 @@ func jiraEdit(args []string, d Deps, format string) int {
 	}
 	fields := map[string]any{}
 	if strings.TrimSpace(*fieldsJSON) != "" {
-		fields, err = parseFieldsJSON(*fieldsJSON)
+		fields, err = parseFieldsJSON(*fieldsJSON, editFieldsExample)
 		if err != nil {
 			return fail(d, err)
 		}
@@ -613,6 +640,8 @@ type jiraDryRun struct {
 	Inward    string `json:"inward,omitempty"`
 	Outward   string `json:"outward,omitempty"`
 	Type      string `json:"type,omitempty"`
+	// Fields is the merged `fields` payload of a create that used --fields.
+	Fields map[string]any `json:"fields,omitempty"`
 }
 
 func resolveParent(raw, project string, site domain.Site) (string, error) {
@@ -633,19 +662,50 @@ func resolveParent(raw, project string, site domain.Site) (string, error) {
 	return key, nil
 }
 
-func parseFieldsJSON(s string) (map[string]any, error) {
+const (
+	createFieldsExample = `atlas jira create --project KEY --type Task --summary '…' --fields '{"customfield_10538":"…"}'`
+	editFieldsExample   = `atlas jira edit KEY-1 --fields '{"summary":"…"}'`
+)
+
+func parseFieldsJSON(s, example string) (map[string]any, error) {
 	s = strings.TrimSpace(s)
 	if s == "" {
-		return nil, domain.Usage("edit requires --fields JSON").WithHint(`atlas jira edit KEY-1 --fields '{"summary":"…"}'`)
+		return nil, domain.Usage("--fields requires a JSON object").WithHint(example)
 	}
 	var fields map[string]any
 	if err := json.Unmarshal([]byte(s), &fields); err != nil {
-		return nil, domain.Usage("fields must be a JSON object").WithHint(`atlas jira edit KEY-1 --fields '{"summary":"…"}'`)
+		return nil, domain.Usage("fields must be a JSON object").WithHint(example)
 	}
 	if fields == nil {
-		return nil, domain.Usage("fields must be a JSON object")
+		return nil, domain.Usage("fields must be a JSON object").WithHint(example)
 	}
 	return fields, nil
+}
+
+// checkCreateFields refuses --fields keys that create owns through flags.
+// flagSet reports which of the shared keys also arrived as a flag.
+func checkCreateFields(fields map[string]any, flagSet map[string]bool) error {
+	for _, reserved := range []string{"project", "issuetype", "summary"} {
+		if hasField(fields, reserved) {
+			return domain.Usagef("--fields cannot set %q", reserved).WithHint("use --project, --type, and --summary")
+		}
+	}
+	for _, shared := range []string{"description", "parent", "labels", "assignee"} {
+		if flagSet[shared] && hasField(fields, shared) {
+			return domain.Usagef("%s specified in both --fields and --%s", shared, shared)
+		}
+	}
+	return nil
+}
+
+// hasField reports whether fields has name, ignoring case and surrounding space.
+func hasField(fields map[string]any, name string) bool {
+	for key := range fields {
+		if strings.EqualFold(strings.TrimSpace(key), name) {
+			return true
+		}
+	}
+	return false
 }
 
 func refuseCustomerJira(site domain.Site) error {

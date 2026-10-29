@@ -22,6 +22,8 @@ type getOut struct {
 func runGet(t *testing.T, d Deps, args ...string) (getOut, string) {
 	t.Helper()
 	out, errw := d.Stdout.(*bytes.Buffer), d.Stderr.(*bytes.Buffer)
+	out.Reset()
+	errw.Reset()
 	code := Run(append([]string{"atlas", "jira", "get"}, args...), d)
 	if code != domain.ExitOK {
 		t.Fatalf("exit %d: %s", code, errw.String())
