@@ -10,6 +10,7 @@ Namespaces:
   jira         get, comments, search, suggest, users, boards, board, transitions, create, edit, comment, transition, link
   confluence   get, search, create, update (no delete)
   pr           get, list, comments, create, edit, comment, approve, merge, diff (no delete)
+  pipeline     list, get, steps, logs, run, stop; variable-* and schedule-* (Bitbucket Cloud)
   jsm          customer REST: desks, types, list, get, create, comment, transition
   mcp          stdio MCP for agents (serve)
 

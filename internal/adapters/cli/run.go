@@ -14,6 +14,7 @@ import (
 	"github.com/masonhuemmer/atlas/internal/app/confluence"
 	"github.com/masonhuemmer/atlas/internal/app/jira"
 	"github.com/masonhuemmer/atlas/internal/app/jsm"
+	"github.com/masonhuemmer/atlas/internal/app/pipeline"
 	"github.com/masonhuemmer/atlas/internal/app/pr"
 	"github.com/masonhuemmer/atlas/internal/config"
 	"github.com/masonhuemmer/atlas/internal/domain"
@@ -26,6 +27,7 @@ type Deps struct {
 	Jira       jira.Store
 	Confluence confluence.Store
 	PR         pr.Store
+	Pipeline   pipeline.Store
 	JSM        jsm.Store
 	Stdin      io.Reader
 	Stdout     io.Writer
@@ -65,6 +67,8 @@ func Run(args []string, d Deps) int {
 		return runConfluence(rest, d, format)
 	case "pr":
 		return runPR(rest, d, format)
+	case "pipeline":
+		return runPipeline(rest, d, format)
 	case "jsm":
 		return runJSM(rest, d, format)
 	case "mcp":
@@ -179,6 +183,7 @@ var boolFlags = map[string]bool{
 	"--dry-run": true, "--help": true, "-h": true,
 	"--json": true, "--human": true, "--verbose": true, "--debug": true,
 	"--from-op": true,
+	"--secured": true, "--enabled": true,
 }
 
 func parseMixed(fsset *flag.FlagSet, args []string) error {

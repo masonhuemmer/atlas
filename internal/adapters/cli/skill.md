@@ -4,7 +4,7 @@ description: >
   Use dedicated atlas MCP for Jira, Confluence, Bitbucket, and JSM customer
   REST on one configured cloud per call. Use when calling atlas_status,
   atlas_help, atlas_read, or atlas_write, or when the operator names atlas, Jira,
-  Confluence, Bitbucket PRs, or a JSM customer portal.
+  Confluence, Bitbucket PRs or Pipelines, or a JSM customer portal.
 ---
 
 # Atlas MCP
@@ -35,7 +35,7 @@ without dashes (`jql`, `site`, `dry-run`). Writes stay dry-run unless
 Forbidden via either tool: `auth login`, `auth logout`, namespace `mcp`.
 Those are terminal commands.
 
-Failure content is `{class,message,hint}` with `usage` | `auth` | `service` | `not_found`. Site auth → tell the operator to run `atlas auth login --site ALIAS`. PR auth → tell the operator to run `atlas auth login --workspace WORKSPACE`. Do not print tokens.
+Failure content is `{class,message,hint}` with `usage` | `auth` | `service` | `not_found`. Site auth → tell the operator to run `atlas auth login --site ALIAS`. Bitbucket auth → tell the operator to run `atlas auth login --workspace WORKSPACE`. Do not print tokens.
 
 Recipes (`atlas_help` `topic`, also MCP prompts): `jira-search`,
 `confluence-write`, `pr-review`, `jsm-customer`. This skill is also
@@ -78,6 +78,10 @@ keys map to an alias. JQL/CQL that names two sites is usage. A
 | Move a Confluence page | `atlas_write` `namespace=confluence` `verb=move` `args=["PAGE_ID"]` `flags={parent:"NEW_PARENT_ID",site:"ALIAS"}` + `write_opt_in`; source and parent must be in the same space. No delete |
 | PR get/list/comments/diff | `atlas_read` `pr` `get` / `list` / `comments` / `diff` (`repo`, `id`); `get` includes author and approval participants |
 | PR create/edit/comment/approve/merge | `atlas_write`; edit an open PR's title or description with `namespace=pr` `verb=edit` `flags={repo:"SLUG",id:1,description:"…"}` + `write_opt_in`; approve with `namespace=pr` `verb=approve` `flags={repo:"SLUG",id:1}` + `write_opt_in`; no delete |
+| Pipeline list/get/steps/logs | `atlas_read` `namespace=pipeline`; use `atlas_help` `namespace=pipeline` for flags |
+| Pipeline run/stop | `atlas_write` `namespace=pipeline` + `write_opt_in`; `run` requires an explicit `branch` |
+| Pipeline variable-list/get and schedule-list/get | `atlas_read` `namespace=pipeline` |
+| Pipeline variable-create/update/delete and schedule-create/update/delete | `atlas_write` `namespace=pipeline` + `write_opt_in`; use the complete hyphenated verb |
 | JSM desks/types/list/get | `atlas_read` `jsm` `desks` / `types` / `list` / `get` |
 | JSM create/comment/transition | `atlas_write`; comments are public |
 
@@ -109,4 +113,19 @@ A string for a `textarea` custom field is Markdown and is converted to Jira rich
 
 ## Preflight
 
-If `atlas_status` shows the needed site or workspace `usable` false, stop and tell the operator to use the matching terminal login command. Sites use `atlas auth login --site ALIAS --email EMAIL --token TOKEN`; PR workspaces use `atlas auth login --workspace WORKSPACE --email EMAIL --token TOKEN`. Do not loop on login. A site credential never authorizes a PR operation.
+If `atlas_status` shows the needed site or workspace `usable` false, stop and tell the operator to use the matching terminal login command. Sites use `atlas auth login --site ALIAS --email EMAIL --token TOKEN`; Bitbucket workspaces use `atlas auth login --workspace WORKSPACE --email EMAIL --token TOKEN`. Do not loop on login. A site credential never authorizes a Bitbucket operation.
+
+Pipelines use the same workspace credential as PRs. Reads require
+`read:pipeline:bitbucket`; starting runs also requires `write:pipeline:bitbucket`.
+A stop response acknowledges the request; read the run again to check completion.
+
+Variable writes require `admin:pipeline:bitbucket`. Use `value-file` with a local
+file path through MCP; stdin is terminal-only. Values never appear in output or
+previews. Writes replace the key, value, and secured flag, defaulting to secured.
+Variable scope is repository by default; workspace scope omits `repo`, while
+deployment scope requires `repo` and an `environment` UUID.
+
+Schedule creation and update require read and write pipeline scopes. Cron uses
+seven fields in UTC. `schedule-update` only changes `enabled`; pass JSON
+`enabled:false` to disable. Changing cron or target requires an explicit new
+schedule and deletion of the old schedule. Consult the verb's help for flags.

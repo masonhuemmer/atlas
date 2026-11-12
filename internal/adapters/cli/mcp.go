@@ -87,7 +87,7 @@ func NewMCPServer(d Deps) *mcp.Server {
 	}, handleHelp)
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "atlas_read",
-		Description: "Run one read CLI namespace+verb (get, search, suggest, users, boards, board, transitions, list, diff, desks, types, site list/resolve, auth status) with a flag map. Returns that command's JSON. Refuses write verbs; use atlas_write. Lookup examples: help topics jira-search, confluence-write, pr-review, jsm-customer. Skill: atlas://skill.",
+		Description: "Run one read CLI namespace+verb (get, search, suggest, users, boards, board, transitions, list, diff, desks, types, pipeline steps/logs, pipeline variable-list/get and schedule-list/get, site list/resolve, auth status) with a flag map. Returns that command's JSON. Refuses write verbs; use atlas_write. Lookup examples: help topics jira-search, confluence-write, pr-review, jsm-customer, or namespace pipeline. Skill: atlas://skill.",
 		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true, IdempotentHint: true, OpenWorldHint: &yes},
 	}, func(_ context.Context, _ *mcp.CallToolRequest, in readIn) (*mcp.CallToolResult, any, error) {
 		args, err := buildReadArgs(in.Namespace, in.Verb, in.Args, in.Flags)
@@ -98,7 +98,7 @@ func NewMCPServer(d Deps) *mcp.Server {
 	})
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "atlas_write",
-		Description: "Run one write CLI namespace+verb (create, edit, comment, transition, link, update, move, approve, merge) with a flag map. Returns a dry-run preview unless write_opt_in is true. Refuses read verbs; use atlas_read. Skill: atlas://skill.",
+		Description: "Run one write CLI namespace+verb (create, edit, comment, transition, link, update, move, approve, merge, pipeline run/stop, pipeline variable-create/update/delete and schedule-create/update/delete) with a flag map. Returns a dry-run preview unless write_opt_in is true. Variable values use a file path, not stdin, and never appear in output. Refuses read verbs; use atlas_read. Skill: atlas://skill.",
 		Annotations: &mcp.ToolAnnotations{DestructiveHint: &yes, OpenWorldHint: &yes},
 	}, func(_ context.Context, _ *mcp.CallToolRequest, in writeIn) (*mcp.CallToolResult, any, error) {
 		args, err := buildWriteArgs(in.Namespace, in.Verb, in.Args, in.Flags, in.WriteOptIn)
