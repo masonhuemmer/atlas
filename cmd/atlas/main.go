@@ -24,6 +24,7 @@ func main() {
 		d.Jira = atlassian.JiraAPI{Memory: mem}
 		d.Confluence = atlassian.ConfluenceAPI{Memory: mem}
 		d.PR = atlassian.PRAPI{Memory: mem}
+		d.Pipeline = atlassian.SeedPipelines()
 		d.JSM = atlassian.JSMAPI{Memory: mem}
 		d.Store = &keychain.FileStore{Path: keychain.FakeSessionPath()}
 		d.Login = auth.FakeLogin()
@@ -44,6 +45,7 @@ func main() {
 		d.Jira = rest.Jira{Client: live}
 		d.Confluence = rest.Confluence{Client: live}
 		d.PR = rest.Bitbucket{Client: live}
+		d.Pipeline = rest.BitbucketPipelines{Client: live}
 		d.JSM = rest.JSM{Client: live}
 	}
 	os.Exit(cli.Run(os.Args, d))

@@ -42,9 +42,7 @@ func FlagMapToArgs(ns, verb string, pos []string, flags map[string]any) ([]strin
 		switch v := flags[k].(type) {
 		case nil:
 		case bool:
-			if v {
-				out = append(out, name+"=true")
-			}
+			out = append(out, name+"="+strconv.FormatBool(v))
 		case string:
 			out = append(out, name+"="+v)
 		case float64:
@@ -91,6 +89,9 @@ func isWrite(ns, verb string) bool {
 	case "jira create", "jira edit", "jira comment", "jira transition", "jira link", "jira download",
 		"confluence create", "confluence update", "confluence move",
 		"pr create", "pr edit", "pr comment", "pr approve", "pr merge",
+		"pipeline run", "pipeline stop",
+		"pipeline variable-create", "pipeline variable-update", "pipeline variable-delete",
+		"pipeline schedule-create", "pipeline schedule-update", "pipeline schedule-delete",
 		"jsm create", "jsm comment", "jsm transition":
 		return true
 	}
@@ -105,6 +106,8 @@ func isRead(ns, verb string) bool {
 		"jira get", "jira comments", "jira search", "jira suggest", "jira users", "jira boards", "jira board", "jira transitions", "jira attachments",
 		"confluence get", "confluence search",
 		"pr get", "pr list", "pr comments", "pr diff",
+		"pipeline list", "pipeline get", "pipeline steps", "pipeline logs",
+		"pipeline variable-list", "pipeline variable-get", "pipeline schedule-list", "pipeline schedule-get",
 		"jsm desks", "jsm types", "jsm list", "jsm get":
 		return true
 	}
@@ -156,5 +159,16 @@ func buildWriteArgs(ns, verb string, pos []string, flags map[string]any, optIn b
 		}
 		return nil, &domain.Error{Class: domain.ClassUsage, Message: fmt.Sprintf("%s %s is not a write", ns, verb), Hint: hint}
 	}
-	return FlagMapToArgs(ns, verb, pos, applyWriteGate(ns, verb, flags, optIn))
+	args, err := FlagMapToArgs(ns, verb, pos, applyWriteGate(ns, verb, flags, optIn))
+	if err != nil {
+		return nil, err
+	}
+	if ns == "pipeline" && strings.HasPrefix(verb, "variable-") {
+		for _, arg := range args {
+			if arg == "--value-file=-" {
+				return nil, domain.Usage("stdin values are terminal-only; use a value file path through MCP")
+			}
+		}
+	}
+	return args, nil
 }

@@ -59,11 +59,13 @@ No args → overview: four tools, four recipe topics, skill resource, write opt-
 
 ### Read list
 
-`auth status`, `site list|resolve`, `jira get|search`, `confluence get|search`, `pr get|list|diff`, `jsm desks|types|list|get`. `atlas_read` refuses every other verb with `usage`: a write verb gets hint `use atlas_write`. The list is an allowlist, so a new verb is refused until it is classified.
+`auth status`, `site list|resolve`, `jira get|search`, `confluence get|search`, `pr get|list|diff`, `pipeline list|get|steps|logs|variable-list|variable-get|schedule-list|schedule-get`, `jsm desks|types|list|get`. `atlas_read` refuses every other verb with `usage`: a write verb gets hint `use atlas_write`. The list is an allowlist, so a new verb is refused until it is classified.
 
 ### Write gate
 
-Write list: `jira create|edit|comment|transition|link`, `confluence create|update`, `pr create|comment|merge`, `jsm create|comment|transition`. `atlas_write` refuses every other verb with `usage`: a read verb gets hint `use atlas_read`. Writes dry-run unless `write_opt_in` is true.
+Write list: `jira create|edit|comment|transition|link`, `confluence create|update`, `pr create|comment|merge`, `pipeline run|stop|variable-create|variable-update|variable-delete|schedule-create|schedule-update|schedule-delete`, `jsm create|comment|transition`. `atlas_write` refuses every other verb with `usage`: a read verb gets hint `use atlas_read`. Writes dry-run unless `write_opt_in` is true.
+
+Boolean false flag values are retained, including `secured:false` and `enabled:false`. Variable writes take a `value-file` path; `value-file:"-"` is refused through MCP because stdin carries the transport. Variable values are omitted from all outputs and previews.
 
 ### Forbidden via either tool
 
@@ -73,7 +75,7 @@ Write list: `jira create|edit|comment|transition|link`, `confluence create|updat
 
 | Command | Behavior |
 | --- | --- |
-| `atlas --help` | Lists `auth`, `site`, `jira`, `confluence`, `pr`, `jsm`, `mcp`. JSON, exit classes 3/4/5/6. |
+| `atlas --help` | Lists `auth`, `site`, `jira`, `confluence`, `pr`, `pipeline`, `jsm`, `mcp`. JSON, exit classes 3/4/5/6. |
 | `atlas mcp --help` / `atlas mcp serve --help` | Exit 0, no session. Names stdio, four tools, write opt-in default false, four recipe topics. |
 | `atlas mcp serve` | JSON-RPC on stdio until stdin closes. `--human` → usage (3). |
 | `atlas auth status` | Signed-out JSON with catalog sites, no tokens. |

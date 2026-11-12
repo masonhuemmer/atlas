@@ -26,6 +26,7 @@ func testDeps() (Deps, *bytes.Buffer, *bytes.Buffer) {
 		Jira:       atlassian.JiraAPI{Memory: mem},
 		Confluence: atlassian.ConfluenceAPI{Memory: mem},
 		PR:         atlassian.PRAPI{Memory: mem},
+		Pipeline:   atlassian.SeedPipelines(),
 		JSM:        atlassian.JSMAPI{Memory: mem},
 		Stdout:     out,
 		Stderr:     errw,

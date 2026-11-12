@@ -53,7 +53,7 @@ Missing config without `ATLAS_FAKE=1` is usage (exit 3).
 
 ## Auth
 
-Per-site Basic `email:token` in the OS keyring (file fallback for oversized credentials). Login stays in a terminal. Jira, Confluence, and JSM use `--site`. Bitbucket PRs use a **separate** workspace token; they do not reuse a licensed-site or JSM slot.
+Per-site Basic `email:token` in the OS keyring (file fallback for oversized credentials). Login stays in a terminal. Jira, Confluence, and JSM use `--site`. Bitbucket PRs and Pipelines use a **separate** workspace token; they do not reuse a licensed-site or JSM slot.
 
 ```sh
 atlas auth login --site ALIAS --email EMAIL --token TOKEN
@@ -86,6 +86,10 @@ Write:
 
 `pr get`, `list`, `comments`, and `diff` need the read pullrequest and repository scopes. `pr create`, `edit`, `comment`, `approve`, and `merge` also need `write:pullrequest:bitbucket`. Missing workspace cred is auth (exit 4); hint is `atlas auth login --workspace WORKSPACE`. There is no fallback to a Jira site token.
 
+Pipeline reads need `read:pipeline:bitbucket`. Starting runs needs both `read:pipeline:bitbucket` and `write:pipeline:bitbucket`; stopping needs `write:pipeline:bitbucket`. Add these scopes to the workspace token as needed. See the [Bitbucket Pipelines REST API](https://developer.atlassian.com/cloud/bitbucket/rest/api-group-pipelines/) for endpoint permissions.
+
+Reading variables and schedules also needs `read:pipeline:bitbucket`. Variable creation, replacement, and deletion need `admin:pipeline:bitbucket`. Schedule creation and enabling/disabling need both read and write pipeline scopes; schedule deletion needs the write scope. The token's user must also have access to the selected repository, workspace, or deployment environment.
+
 ## Usage
 
 ```
@@ -99,6 +103,7 @@ atlas <namespace> <verb> [flags]
 | `jira` | `get`, `comments`, `attachments`, `download`, `search`, `suggest`, `users`, `boards`, `board placement`, `transitions`, `create`, `edit`, `comment`, `transition`, `link` |
 | `confluence` | `get`, `search`, `create`, `update`, `move` |
 | `pr` | `get`, `list`, `comments`, `create`, `edit`, `comment`, `approve`, `merge`, `diff` |
+| `pipeline` | `list`, `get`, `steps`, `logs`, `run`, `stop`, `variable-list/get/create/update/delete`, `schedule-list/get/create/update/delete` |
 | `jsm` | `desks`, `types`, `list`, `get`, `create`, `comment`, `transition` |
 | `mcp` | `serve` |
 
@@ -141,6 +146,66 @@ Read custom fields and status history with `--fields`: `atlas jira get KEY-1 --f
 Set custom fields when creating or editing with `--fields`, a JSON object of REST fields: `atlas jira create --project SDO --type Task --summary '...' --fields '{"customfield_10538":"line one\n\nline two","customfield_10481":{"accountId":"ACCOUNT_ID"}}'`. On create the object is merged into the issue; `project`, `issuetype` and `summary` in it are usage errors, and `description`, `parent`, `labels` and `assignee` cannot also be given as flags. Jira REST v3 rejects a plain string for a multi-line (`textarea`) custom field, so Atlas looks up the field's schema (one `GET /rest/api/3/field`, only when `--fields` has a string under a `customfield_` key) and converts that string from Markdown to Jira's rich-text format, the same way as a description. Strings for other field types, and objects and lists, are sent as given. `--dry-run` on create echoes the merged payload as `fields`, so you can check the conversion; it may do that one read and never writes. When Jira rejects a create or edit with a 400, the error message includes Jira's per-field text (at most about 500 characters) and the exit class stays `service` (5). Through MCP, pass `fields` as a JSON string.
 
 Jira issue descriptions and public comments accept Markdown. Atlas converts headings, lists, emphasis, links, code, and tables to Jira's rich-text document format when writing. Existing descriptions stored as literal Markdown need to be edited once to render with formatting.
+
+### Bitbucket Pipelines
+
+Manage runs of definitions already in the repository's `bitbucket-pipelines.yml`:
+
+```sh
+atlas pipeline list --repo SLUG --branch main --status FAILED --page 1 --limit 20
+atlas pipeline get --repo SLUG --id '{PIPELINE_UUID}'
+atlas pipeline steps --repo SLUG --id '{PIPELINE_UUID}'
+atlas pipeline logs --repo SLUG --id '{PIPELINE_UUID}' --step '{STEP_UUID}' --human
+atlas pipeline run --repo SLUG --branch main --dry-run
+atlas pipeline run --repo SLUG --branch main --custom 'Deploy preview' --dry-run
+atlas pipeline stop --repo SLUG --id '{PIPELINE_UUID}' --dry-run
+```
+
+All commands accept `--workspace WORKSPACE`, defaulting to `[defaults].workspace`. Use the `uuid` from `list` for `--id` and the step `uuid` from `steps` for `--step`; braces are optional. Runs require an explicit `--branch`. Omit `--custom` to use the branch's normal pipeline definition.
+
+`list` and `steps` return one page, with `count`, `page`, `pagelen`, `items`, and a `next` link when another page exists. Increase `--page` to fetch the next page; `--limit` accepts 1–100. List status filters are `PARSING`, `PENDING`, `PAUSED`, `HALTED`, `BUILDING`, `ERROR`, `PASSED`, `FAILED`, `STOPPED`, or `UNKNOWN` (case insensitive). The run output separates its progress `state` from its final `result`; for example, `COMPLETED` / `SUCCESSFUL` corresponds to the `PASSED` filter.
+
+Logs are returned in the JSON `log` field; `--human` prints plain text. A failed or interrupted download returns an error rather than a partial log. CLI `run` and `stop` execute when `--dry-run` is omitted. A successful stop returns `stop_requested: true`; use `get` to check the final state.
+
+MCP uses `atlas_read` with `namespace=pipeline` for `list`, `get`, `steps`, and `logs`. Use `atlas_write` for `run` and `stop`; these remain dry-run previews until `write_opt_in=true`. `atlas_help` with `namespace=pipeline` lists the flags. Per-run variable overrides and editing pipeline definitions are outside this command set.
+
+#### Stored variables
+
+`variable-list`, `variable-get`, `variable-create`, `variable-update`, and `variable-delete` support three scopes:
+
+| Scope | Required flags |
+| --- | --- |
+| `repository` (default) | `--repo SLUG` |
+| `workspace` | `--scope workspace`; omit `--repo` and `--environment` |
+| `deployment` | `--scope deployment --repo SLUG --environment UUID` |
+
+```sh
+atlas pipeline variable-list --repo SLUG
+atlas pipeline variable-get --repo SLUG --id '{VARIABLE_UUID}'
+atlas pipeline variable-create --repo SLUG --key API_KEY --value-file /path/to/value --dry-run
+atlas pipeline variable-update --repo SLUG --id '{VARIABLE_UUID}' --key API_KEY --value-file /path/to/replacement --dry-run
+atlas pipeline variable-delete --repo SLUG --id '{VARIABLE_UUID}' --dry-run
+```
+
+Values are always omitted from output, including unsecured values and dry-run previews. Writes read the exact file contents (including trailing newlines), default to `--secured=true`, and replace the key, value, and secured flag together. Pass `--secured=false` explicitly for an unsecured variable. To read a value from terminal stdin, use `--value-file -`; through MCP, use a file path so the command does not consume the MCP transport. Dry-run does not read the value file.
+
+`variable-list` supports `--page` and `--limit`. Use its UUIDs with the other variable commands. Deployment `variable-get` searches the paginated environment-variable list because Bitbucket has no individual GET endpoint for that scope.
+
+#### Schedules
+
+```sh
+atlas pipeline schedule-list --repo SLUG
+atlas pipeline schedule-get --repo SLUG --id '{SCHEDULE_UUID}'
+atlas pipeline schedule-create --repo SLUG --branch main --custom nightly --cron '0 0 0 * * ? *' --dry-run
+atlas pipeline schedule-update --repo SLUG --id '{SCHEDULE_UUID}' --enabled=false --dry-run
+atlas pipeline schedule-delete --repo SLUG --id '{SCHEDULE_UUID}' --dry-run
+```
+
+The example cron runs at midnight UTC. Bitbucket's API uses seven fields (seconds, minutes, hours, day of month, month, day of week, year); Atlas checks the field count and Bitbucket validates the expression. New schedules default to enabled; pass `--enabled=false` to create one disabled. `--custom NAME` selects a custom pipeline; omitting it selects the default pipeline definition. `schedule-list` supports `--page` and `--limit`.
+
+The API can update only a schedule's enabled status. To change its cron, branch, or pipeline definition, create a replacement schedule and delete the old one explicitly. Atlas does not silently recreate schedules.
+
+All settings writes support `--dry-run`. Through MCP, use `atlas_read` for `variable-list/get` and `schedule-list/get`, and `atlas_write` for the corresponding create/update/delete verbs with `write_opt_in=true` to execute. JSON boolean `false` is preserved for flags such as `enabled` and `secured`.
 
 ## MCP
 
